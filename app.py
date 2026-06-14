@@ -45,8 +45,16 @@ if uploaded_file is not None:
             # beam_size=5 balances speed and accuracy
             segments, info = model.transcribe(tmp_audio_path, beam_size=5)
             
-            # Faster-whisper returns a generator, so we iterate through it
-            transcript_text = " ".join([segment.text for segment in segments])
+           # Extract timestamps and format them cleanly
+transcript_lines = []
+for segment in segments:
+    # Convert raw seconds into a clean [Start -> End] format
+    start_time = f"{segment.start:.2f}s"
+    end_time = f"{segment.end:.2f}s"
+    transcript_lines.append(f"[{start_time} -> {end_time}] {segment.text.strip()}")
+
+# Join the lines with a line break so it stacks neatly in the text area
+transcript_text = "\n".join(transcript_lines)
             
             st.success("Transcription Complete!")
             st.text_area("Transcript", transcript_text, height=300)
