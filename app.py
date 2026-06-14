@@ -12,9 +12,9 @@ st.write("Powered by faster-whisper and INT8 CPU quantization.")
 # 1. Load the Optimized CTranslate2 Model
 @st.cache_resource
 def load_model():
-    # INT8 quantization makes the model run up to 4x faster on CPU
-    return WhisperModel("tiny", device="cpu", compute_type="int8")
-
+    # Upgraded from "tiny" to "base" for higher accuracy. 
+    # (If the server crashes, downgrade back to "tiny" or try "small" if running locally).
+    return WhisperModel("base", device="cpu", compute_type="int8")
 model = load_model()
 
 # 2. File Upload Handling
@@ -40,13 +40,20 @@ if uploaded_file is not None:
             clip.write_audiofile(tmp_audio_path, fps=16000, logger=None)
             clip.close()
             
-        # Phase 2: High-Speed Transcription with MM:SS Timestamps
-        with st.spinner("Generating transcript at high speed..."):
-            # beam_size=5 balances speed and accuracy
-            segments, info = model.transcribe(tmp_audio_path, beam_size=5)
+        # Phase 2: High-Speed Transcription with Enhanced Accuracy
+        with st.spinner("Generating highly accurate transcript..."):
             
-            # --- The updated MM:SS timestamp formatting block ---
+            # Increased beam_size to 7 and enabled vad_filter
+            segments, info = model.transcribe(
+                tmp_audio_path, 
+                beam_size=7, 
+                vad_filter=True,
+                vad_parameters=dict(min_silence_duration_ms=500)
+            )
+            
+            # --- The MM:SS timestamp formatting block ---
             transcript_lines = []
+            # ... (keep the rest of your timestamp loop exactly the same)
             for segment in segments:
                 # Convert raw float seconds to integers and extract minutes/seconds
                 start_min, start_sec = divmod(int(segment.start), 60)
