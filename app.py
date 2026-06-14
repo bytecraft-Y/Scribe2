@@ -28,8 +28,21 @@ whisper_model = load_whisper()
 def convert_to_roman_hinglish(raw_text, key):
     genai.configure(api_key=key)
     
-    # --- CHANGED: Use the universally stable 'gemini-pro' endpoint ---
-    llm = genai.GenerativeModel('gemini-pro') 
+    # --- THE FIX: Dynamic Model Routing ---
+    # Query Google's servers to return only the models active on your account
+    available_models = [
+        m.name for m in genai.list_models() 
+        if 'generateContent' in m.supported_generation_methods
+    ]
+    
+    if not available_models:
+        return "API Error: No valid generative models are authorized for this API key."
+        
+    # Automatically hunt for the newest 'flash' model, fallback to the first valid one
+    target_model = next((m for m in available_models if 'flash' in m), available_models[0])
+    
+    # Pass the verified, active model directly to the generator
+    llm = genai.GenerativeModel(target_model) 
     
     system_prompt = (
         "You are a strict transliteration engine. Your job is to take mixed Hindi/English text "
