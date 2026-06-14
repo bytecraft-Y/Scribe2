@@ -205,40 +205,64 @@ with col_output:
                 col_txt.download_button("📥 TXT", st.session_state.pure_text, "Scribe.txt")
                 col_srt.download_button("🎬 SRT", st.session_state.srt_text, "Scribe.srt")
                 col_vtt.download_button("🌐 VTT", st.session_state.vtt_text, "Scribe.vtt")
-
-            # --- TAB 2: AI INSIGHTS ---
+# --- TAB 2: AI INSIGHTS ---
             with tab_ai:
                 st.markdown("### 🧠 Automated Knowledge Extraction")
-                st.write("Generate a structured executive summary and extract key questions from the raw audio data.")
+                st.write("Generate a structured executive summary, extract action items, and identify key decisions using Large Language Models.")
                 
-                if st.button("✨ Generate Smart Summary"):
-                    with st.spinner("Analyzing semantic structure..."):
-                        time.sleep(1.5) 
-                        
-                        # Fallback Mock NLP Extractor
-                        full_text = " ".join([s['text'] for s in st.session_state.segments_data])
-                        sentences = [s.strip() for s in full_text.replace('?', '.').replace('!', '.').split('.') if len(s) > 20]
-                        questions = [s.strip() + "?" for s in full_text.split('?') if len(s) > 15][:-1]
-                        
-                        mock_summary = "#### 📌 Executive Summary\n"
-                        if sentences:
-                            mock_summary += f"* **Primary Topic:** The speaker discusses concepts relating to '{sentences[0][:50]}...'\n"
-                            mock_summary += f"* **Key Statement:** \"{random.choice(sentences)}\"\n"
-                        else:
-                            mock_summary += "* Insufficient data for summary.\n"
-                            
-                        if questions:
-                            mock_summary += "\n#### ❓ Extracted Questions/Action Items\n"
-                            for q in questions[:3]:
-                                mock_summary += f"* {q}\n"
+                # Enterprise Security: Secure API Key Input
+                st.markdown("<br>", unsafe_allow_html=True)
+                api_key = st.text_input("🔑 Enter your Gemini API Key to unlock AI Insights:", type="password", help="Get a free key at aistudio.google.com")
+                
+                if st.button("✨ Generate Smart Summary", type="primary"):
+                    if not api_key:
+                        st.error("⚠️ Please enter a valid API key to proceed.")
+                    else:
+                        with st.spinner("Analyzing semantic structure and extracting insights..."):
+                            try:
+                                # Dynamic Import so the app doesn't break if the module is missing
+                                import google.generativeai as genai
                                 
-                        st.session_state.ai_summary = mock_summary
+                                # Configure the AI
+                                genai.configure(api_key=api_key)
+                                llm = genai.GenerativeModel('gemini-1.5-flash')
+                                
+                                # Advanced Prompt Engineering
+                                sys_prompt = f"""
+                                You are an elite executive assistant. Analyze the following transcript and extract the business value. 
+                                Format your response strictly using Markdown with these exact sections:
+                                
+                                ### 📌 Executive Summary
+                                (Provide a concise, 3-sentence summary of the core discussion.)
+                                
+                                ### ✅ Action Items
+                                (Provide a bulleted list of specific tasks, next steps, or assignments mentioned. If none, state 'No clear action items detected.')
+                                
+                                ### 💡 Key Decisions & Insights
+                                (Highlight the 2-3 most important takeaways, agreements, or data points discussed.)
+                                
+                                Transcript to analyze:
+                                {st.session_state.pure_text}
+                                """
+                                
+                                # Execute AI Call
+                                response = llm.generate_content(sys_prompt)
+                                st.session_state.ai_summary = response.text
+                                
+                            except ImportError:
+                                st.error("Missing dependency. Please run: pip install google-generativeai")
+                            except Exception as e:
+                                st.error(f"API Error: {str(e)}")
                 
+                # Render the Output Beautifully
                 if st.session_state.ai_summary:
-                    st.markdown("<div style='background: #F1F5F9; padding: 20px; border-radius: 8px; border-left: 4px solid #3B82F6; color: #0F172A;'>", unsafe_allow_html=True)
+                    st.markdown("<div style='background: #F8FAFC; padding: 25px; border-radius: 8px; border-left: 5px solid #8B5CF6; color: #0F172A; margin-top: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>", unsafe_allow_html=True)
                     st.markdown(st.session_state.ai_summary)
                     st.markdown("</div>", unsafe_allow_html=True)
-
+                    
+                    # Add a quick-copy button for the user to export the AI summary
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    st.download_button("📥 Download Executive Brief", st.session_state.ai_summary, "Executive_Brief.md", "text/markdown")
 # ==========================================
 # JAVASCRIPT BRIDGE (Precise Regex & Auto-Scroll)
 # ==========================================
