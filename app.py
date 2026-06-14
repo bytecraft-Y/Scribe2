@@ -6,17 +6,15 @@ import tempfile
 import gc
 
 st.set_page_config(page_title="Global Media Transcriber", layout="wide")
-st.title("🌍 Multilingual & Hinglish Optimized Transcriber")
-st.write("Powered by faster-whisper with advanced tokenization bias for code-switched audio.")
+st.title("🌍 Universal Multilingual & Hinglish Transcriber")
 
-# 1. Load the Optimized CTranslate2 Model
 @st.cache_resource
 def load_model():
     return WhisperModel("tiny", device="cpu", compute_type="int8")
 
 model = load_model()
 
-# --- Language & Task Configuration UI ---
+# --- UI Configuration ---
 st.markdown("### Transcription Settings")
 col1, col2 = st.columns(2)
 
@@ -35,13 +33,19 @@ with col1:
 with col2:
     mode_selection = st.radio(
         "Output Mode", 
-        ["Transcribe (Keep Hinglish/Original text)", "Translate (Convert everything to pure English)"]
+        ["Transcribe (Keep original text)", "Translate (Force to English)"]
     )
     task_code = "translate" if "Translate" in mode_selection else "transcribe"
 
+# --- NEW: Dynamic Context Input ---
+st.markdown("#### Advanced Accuracy (Recommended for Hinglish)")
+video_context = st.text_input(
+    "What is this video about? (Optional)", 
+    placeholder="e.g., Software engineering, a spiritual podcast, a gaming vlog..."
+)
 st.markdown("---")
 
-# 2. File Upload Handling
+# --- File Processing ---
 SUPPORTED_FORMATS = ["mp3", "wav", "mp4", "ts", "mov", "mkv", "avi"]
 uploaded_file = st.file_uploader("Select Media File", type=SUPPORTED_FORMATS)
 
@@ -57,30 +61,32 @@ if uploaded_file is not None:
     tmp_audio_path = "temp_audio_processing.wav"
 
     try:
-        # Phase 1: Fast Audio Extraction
         with st.spinner("Extracting audio track..."):
             clip = mp.AudioFileClip(tmp_media_path)
             clip.write_audiofile(tmp_audio_path, fps=16000, logger=None)
             clip.close()
             
-        # Phase 2: High-Speed Multilingual Transcription
         with st.spinner(f"Running {task_code} engine..."):
             
-            # --- NEW: Hinglish-Specific Prompt Injection ---
-            # Providing a code-switched baseline context forces Whisper to accept English words 
-            # embedded inside Hindi sentences without hallucinating punctuation or dropping terms.
-            hinglish_prompt = (
-                "Aacha, toh aaj is video mein hum baat karenge engineering models ke baare mein. "
-                "Let's get started. Yeh configuration code perfectly fine chal rha hai, okay?"
-            )
-            
+            # --- The Universal Hinglish Logic ---
+            dynamic_prompt = None
+            if lang_code == "hi":
+                # A generic phonetic primer that tells the AI to expect mixed languages
+                base_primer = "Haan, toh aaj hum baat karenge. Let's start the topic. "
+                
+                # If you typed a topic in the UI, it injects it to bias the vocabulary
+                if video_context.strip():
+                    dynamic_prompt = f"{base_primer} This audio is specifically about {video_context}."
+                else:
+                    dynamic_prompt = base_primer
+
             segments, info = model.transcribe(
                 tmp_audio_path, 
                 beam_size=5,
                 language=lang_code,
                 task=task_code,
-                initial_prompt=hinglish_prompt if lang_code == "hi" else None,
-                condition_on_previous_text=True  # Helps maintain style consistency across audio chunks
+                initial_prompt=dynamic_prompt,
+                condition_on_previous_text=True 
             )
             
             if lang_code is None:
@@ -88,9 +94,7 @@ if uploaded_file is not None:
             else:
                 st.success("Processing Complete!")
             
-            # Compile the text segments cleanly
             transcript_text = " ".join([segment.text for segment in segments])
-            
             st.text_area("Output", transcript_text, height=300)
             
             st.download_button(
@@ -104,7 +108,6 @@ if uploaded_file is not None:
         st.error(f"A processing error occurred: {str(e)}")
         
     finally:
-        # 3. Aggressive Server Cleanup
         if os.path.exists(tmp_media_path):
             os.remove(tmp_media_path)
         if os.path.exists(tmp_audio_path):
