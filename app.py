@@ -1,7 +1,6 @@
 import streamlit as st
 import streamlit.components.v1 as components
 from faster_whisper import WhisperModel
-import moviepy.editor as mp
 import os
 import tempfile
 import gc
@@ -16,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. Custom CSS - "Chrome Stripped" UI
+# 2. Custom CSS - "Chrome Stripped" UI & Enterprise Layout
 st.markdown("""
 <style>
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
@@ -28,7 +27,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Helper Functions
+# Helper Functions for Subtitles
 def to_srt_time(seconds):
     h, rem = divmod(seconds, 3600); m, s = divmod(rem, 60); ms = int((s % 1) * 1000)
     return f"{int(h):02d}:{int(m):02d}:{int(s):02d},{ms:03d}"
@@ -37,6 +36,7 @@ def to_vtt_time(seconds):
     h, rem = divmod(seconds, 3600); m, s = divmod(rem, 60); ms = int((s % 1) * 1000)
     return f"{int(h):02d}:{int(m):02d}:{int(s):02d}.{ms:03d}"
 
+# Load AI Model Natively
 @st.cache_resource
 def load_model():
     return WhisperModel("base", device="cpu", compute_type="int8")
@@ -49,24 +49,32 @@ st.markdown("---")
 
 col_controls, col_output = st.columns([1, 2], gap="large")
 
-# --- LEFT PANEL: MEDIA & ANALYTICS ---
+# ==========================================
+# LEFT PANEL: MEDIA & ANALYTICS
+# ==========================================
 with col_controls:
     with st.container(height=720, border=True):
         st.markdown("### 📥 Input Media")
         uploaded_file = st.file_uploader("Upload audio or video", type=["mp3", "wav", "mp4", "ts", "mov", "mkv", "avi"], label_visibility="collapsed")
         
+        # Anti-Ghosting Placeholder
         media_placeholder = st.empty()
         
+        # Initialize States
         if 'segments_data' not in st.session_state: 
             st.session_state.update({'segments_data': [], 'pure_text': '', 'srt_text': '', 'vtt_text': '', 'analytics': None, 'ai_summary': None})
         
+        # Hard Reset on File Removal
         if uploaded_file is None:
             media_placeholder.empty()
             st.session_state.analytics = None
             st.session_state.ai_summary = None
             st.session_state.segments_data = []
             st.session_state.pure_text = ""
+            st.session_state.srt_text = ""
+            st.session_state.vtt_text = ""
         else:
+            # File Processing
             uploaded_file.seek(0)
             file_extension = os.path.splitext(uploaded_file.name)[1]
             tmp_media = tempfile.NamedTemporaryFile(delete=False, suffix=file_extension)
@@ -82,7 +90,7 @@ with col_controls:
                 else:
                     st.video(uploaded_file)
             
-            # --- INTERNSHIP UPGRADE: Advanced Analytics Grid ---
+            # Advanced Analytics Grid
             if st.session_state.analytics:
                 st.markdown("#### 📊 Speaker Diagnostics")
                 c1, c2 = st.columns(2)
@@ -90,11 +98,12 @@ with col_controls:
                 c1.metric("Language", st.session_state.analytics['lang'])
                 c2.metric("AI Confidence", st.session_state.analytics['conf'])
                 c3.metric("Duration", st.session_state.analytics['dur'])
-                c4.metric("Pace (WPM)", st.session_state.analytics['wpm']) # New WPM Metric
+                c4.metric("Pace (WPM)", st.session_state.analytics['wpm'])
             
             st.markdown("---")
             
             if st.button("🚀 Start Extraction Pipeline"):
+                # Glowing CSS Sound Wave
                 loader_html = """
                 <style>
                     .wave-container { display: flex; justify-content: center; gap: 8px; margin-bottom: 15px;}
@@ -114,19 +123,21 @@ with col_controls:
                 
                 try:
                     with st.status("Initializing Engine...", expanded=True) as status:
-                        tmp_audio_path = "temp_audio_processing.wav"
-                        clip = mp.AudioFileClip(tmp_media_path)
-                        total_dur = clip.duration
-                        clip.write_audiofile(tmp_audio_path, fps=16000, logger=None)
-                        clip.close()
-                        
-                        segments, info = model.transcribe(tmp_audio_path, beam_size=7, vad_filter=True)
+                        # Feed the media directly to Faster-Whisper (No MoviePy needed)
+                        st.write("🧠 Running Base AI Inference...")
+                        segments, info = model.transcribe(tmp_media_path, beam_size=7, vad_filter=True)
                         
                         st.session_state.segments_data, pure_lines, srt_lines, vtt_lines = [], [], [], ["WEBVTT\n"]
                         last_quote = time.time()
                         total_words = 0
                         
-                        motivational_quotes = ["Extracting semantic data...", "Processing acoustic signals...", "Compiling transcription matrix..."]
+                        motivational_quotes = [
+                            "Extracting semantic data...", 
+                            "Processing acoustic signals...", 
+                            "Compiling transcription matrix...",
+                            "\"The secret of getting ahead is getting started.\" — Mark Twain",
+                            "Resolving ambiguity in real time..."
+                        ]
                         
                         for i, seg in enumerate(segments, 1):
                             if time.time() - last_quote > 4: 
@@ -142,7 +153,8 @@ with col_controls:
                             srt_lines.append(f"{i}\n{to_srt_time(seg.start)} --> {to_srt_time(seg.end)}\n{text_val}\n")
                             vtt_lines.append(f"{to_vtt_time(seg.start)} --> {to_vtt_time(seg.end)}\n{text_val}\n")
                         
-                        # Calculate WPM
+                        # Populate Analytics
+                        total_dur = info.duration
                         duration_mins = total_dur / 60
                         calc_wpm = int(total_words / duration_mins) if duration_mins > 0 else 0
                         
@@ -154,7 +166,8 @@ with col_controls:
                         }
                         
                         st.session_state.update({'pure_text': "\n".join(pure_lines), 'srt_text': "\n".join(srt_lines), 'vtt_text': "\n".join(vtt_lines)})
-                        st.session_state.ai_summary = None # Reset summary for new file
+                        st.session_state.ai_summary = None 
+                        
                         visual_loader.empty()
                         st.rerun()
                         
@@ -162,22 +175,25 @@ with col_controls:
                     st.error(f"Error: {e}")
                 finally:
                     if os.path.exists(tmp_media_path): os.remove(tmp_media_path)
-                    if 'tmp_audio_path' in locals() and os.path.exists(tmp_audio_path): os.remove(tmp_audio_path)
                     gc.collect()
 
-# --- RIGHT PANEL: TABS ARCHITECTURE ---
+
+# ==========================================
+# RIGHT PANEL: TABS & INTERACTIVITY
+# ==========================================
 with col_output:
     with st.container(height=720, border=True):
         if not st.session_state.segments_data:
             st.markdown("### 📄 Workspace Output")
             st.info("👈 Upload & Run Pipeline to begin data extraction.")
         else:
-            # --- INTERNSHIP UPGRADE: TABS ---
             tab_transcript, tab_ai = st.tabs(["📄 Raw Transcript", "✨ AI Insights (Beta)"])
             
+            # --- TAB 1: RAW TRANSCRIPT ---
             with tab_transcript:
                 st.markdown("<input type='text' id='search-input' placeholder='🔍 Search exact word...' style='width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #E2E8F0; color: #0F172A;'>", unsafe_allow_html=True)
                 
+                # Dark Slate text (#0F172A) forced to override Streamlit Dark Mode
                 html_content = "<div id='transcript-box' style='height: 400px; overflow-y: auto; padding: 15px; background: #F8FAFC; border-radius: 8px; color: #0F172A;'>"
                 for i, seg in enumerate(st.session_state.segments_data):
                     html_content += f"<span class='transcript-segment' id='seg-{i}' data-start='{seg['start']}' data-end='{seg['end']}' style='display:inline-block; padding: 2px 4px; border-radius:4px; cursor:pointer; color: #0F172A;' title='Click to seek'><strong>{seg['display_time']}</strong> {seg['text']}</span><br>"
@@ -190,20 +206,16 @@ with col_output:
                 col_srt.download_button("🎬 SRT", st.session_state.srt_text, "Scribe.srt")
                 col_vtt.download_button("🌐 VTT", st.session_state.vtt_text, "Scribe.vtt")
 
+            # --- TAB 2: AI INSIGHTS ---
             with tab_ai:
                 st.markdown("### 🧠 Automated Knowledge Extraction")
                 st.write("Generate a structured executive summary and extract key questions from the raw audio data.")
                 
                 if st.button("✨ Generate Smart Summary"):
                     with st.spinner("Analyzing semantic structure..."):
-                        time.sleep(1.5) # Simulated API latency
+                        time.sleep(1.5) 
                         
-                        # --- INTERNSHIP NOTE: Replace this logic with your Gemini API Call later! ---
-                        # prompt = f"Summarize this transcript and list action items: {st.session_state.pure_text}"
-                        # response = gemini_model.generate_content(prompt)
-                        # st.session_state.ai_summary = response.text
-                        
-                        # Simulated NLP Extractor for MVP
+                        # Fallback Mock NLP Extractor
                         full_text = " ".join([s['text'] for s in st.session_state.segments_data])
                         sentences = [s.strip() for s in full_text.replace('?', '.').replace('!', '.').split('.') if len(s) > 20]
                         questions = [s.strip() + "?" for s in full_text.split('?') if len(s) > 15][:-1]
@@ -223,11 +235,13 @@ with col_output:
                         st.session_state.ai_summary = mock_summary
                 
                 if st.session_state.ai_summary:
-                    st.markdown("<div style='background: #F1F5F9; padding: 20px; border-radius: 8px; border-left: 4px solid #3B82F6;'>", unsafe_allow_html=True)
+                    st.markdown("<div style='background: #F1F5F9; padding: 20px; border-radius: 8px; border-left: 4px solid #3B82F6; color: #0F172A;'>", unsafe_allow_html=True)
                     st.markdown(st.session_state.ai_summary)
                     st.markdown("</div>", unsafe_allow_html=True)
 
-# --- JAVASCRIPT BRIDGE (Placed outside tabs so it always runs) ---
+# ==========================================
+# JAVASCRIPT BRIDGE (Precise Regex & Auto-Scroll)
+# ==========================================
 if st.session_state.segments_data:
     js_code = r"""
     <script>
@@ -241,6 +255,7 @@ if st.session_state.segments_data:
             if(media && segs.length>0){ 
                 clearInterval(syncInterval); 
                 
+                // Click-to-Seek
                 segs.forEach(seg => {
                     seg.addEventListener('click', () => {
                         media.currentTime = parseFloat(seg.getAttribute('data-start'));
@@ -248,6 +263,7 @@ if st.session_state.segments_data:
                     });
                 });
                 
+                // Precise Regex Keyword Search
                 if (searchInput) {
                     searchInput.addEventListener('input', (e) => {
                         const term = e.target.value.trim();
@@ -267,6 +283,7 @@ if st.session_state.segments_data:
                     });
                 }
                 
+                // Cinematic Auto-Scroll
                 media.addEventListener('timeupdate', ()=>{ 
                     if (searchInput && searchInput.value.trim().length > 0) return;
                     const time=media.currentTime; 
