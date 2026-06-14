@@ -5,6 +5,8 @@ import moviepy.editor as mp
 import os
 import tempfile
 import gc
+import time
+import random
 
 # 1. Page Configuration
 st.set_page_config(
@@ -121,10 +123,10 @@ with col_controls:
             
             if st.button("🚀 Start Transcription"):
                 
-                # --- FEATURE 4: Pure CSS Animated Sound Wave Loader ---
+                # --- NEW: Pure CSS Animated Sound Wave Loader ---
                 loader_html = """
                 <style>
-                    .wave-container { display: flex; justify-content: center; align-items: center; height: 80px; gap: 8px; margin-bottom: 15px;}
+                    .wave-container { display: flex; justify-content: center; align-items: center; height: 60px; gap: 8px; margin-bottom: 10px;}
                     .wave-bar { width: 8px; height: 16px; background: #3B82F6; border-radius: 8px; animation: pulse 1.2s infinite ease-in-out; }
                     .wave-bar:nth-child(1) { animation-delay: -1.2s; }
                     .wave-bar:nth-child(2) { animation-delay: -1.1s; }
@@ -142,20 +144,20 @@ with col_controls:
                 """
                 
                 try:
-                    # Create an empty Streamlit container to hold the animation
+                    # Create a dedicated empty space for the animation
                     visual_loader = st.empty()
-                    # Inject the glowing wave animation
                     visual_loader.markdown(loader_html, unsafe_allow_html=True)
                     
+                    # Motivational Quotes Array
                     motivational_quotes = [
-                        "\"Great things are not done by impulse...\" — Vincent Van Gogh",
+                        "\"Great things are not done by impulse, but by a series of small things brought together.\" — Vincent Van Gogh",
                         "\"The only way to do great work is to love what you do.\" — Steve Jobs",
-                        "\"Words are, of course, the most powerful drug.\" — Rudyard Kipling",
+                        "\"Words are, of course, the most powerful drug used by mankind.\" — Rudyard Kipling",
                         "Extracting the signal from the noise...",
                         "Translating acoustic waves into meaning..."
                     ]
                     
-                    with st.status("Initializing Engine...", expanded=True) as status:
+                    with st.status("Engine Active...", expanded=True) as status:
                         st.write("⏱️ Demuxing media file...")
                         clip = mp.AudioFileClip(tmp_media_path)
                         total_duration = clip.duration
@@ -170,62 +172,6 @@ with col_controls:
                             vad_parameters=dict(min_silence_duration_ms=500)
                         )
                         
-                        st.session_state.analytics = {
-                            "lang": info.language.upper(),
-                            "conf": f"{info.language_probability * 100:.1f}%",
-                            "dur": f"{int(total_duration // 60)}m {int(total_duration % 60)}s"
-                        }
-                        
-                        st.session_state.segments_data = []
-                        pure_lines = []
-                        srt_lines = []
-                        vtt_lines = ["WEBVTT\n"]
-                        
-                        last_quote_time = time.time()
-                        current_quote = random.choice(motivational_quotes)
-                        status.update(label=f"⏳ {current_quote}")
-                        
-                        for i, segment in enumerate(segments, start=1):
-                            if time.time() - last_quote_time > 4:
-                                current_quote = random.choice(motivational_quotes)
-                                status.update(label=f"⏳ {current_quote}")
-                                last_quote_time = time.time()
-                                
-                            start_min, start_sec = divmod(int(segment.start), 60)
-                            end_min, end_sec = divmod(int(segment.end), 60)
-                            display_time = f"[{start_min:02d}:{start_sec:02d} -> {end_min:02d}:{end_sec:02d}]"
-                            
-                            st.session_state.segments_data.append({
-                                "start": segment.start,
-                                "end": segment.end,
-                                "text": segment.text.strip(),
-                                "display_time": display_time
-                            })
-                            
-                            pure_lines.append(f"{display_time} {segment.text.strip()}")
-                            srt_lines.append(f"{i}\n{to_srt_time(segment.start)} --> {to_srt_time(segment.end)}\n{segment.text.strip()}\n")
-                            vtt_lines.append(f"{to_vtt_time(segment.start)} --> {to_vtt_time(segment.end)}\n{segment.text.strip()}\n")
-                        
-                        st.session_state.pure_text = "\n".join(pure_lines)
-                        st.session_state.srt_text = "\n".join(srt_lines)
-                        st.session_state.vtt_text = "\n".join(vtt_lines)
-                        
-                        status.update(label="Transcription Complete!", state="complete", expanded=False)
-                        
-                        # THE MAGIC: Destroy the animation the exact second it finishes
-                        visual_loader.empty()
-                        
-                        st.rerun() 
-                        
-                except Exception as e:
-                    st.error(f"Error: {str(e)}")
-                    
-                finally:
-                    if os.path.exists(tmp_media_path):
-                        os.remove(tmp_media_path)
-                    if os.path.exists(tmp_audio_path):
-                        os.remove(tmp_audio_path)
-                    gc.collect()                        
                         # Populate Analytics Data
                         st.session_state.analytics = {
                             "lang": info.language.upper(),
@@ -233,14 +179,24 @@ with col_controls:
                             "dur": f"{int(total_duration // 60)}m {int(total_duration % 60)}s"
                         }
                         
-                        st.write("✍️ Formatting subtitle packages...")
-                        
                         st.session_state.segments_data = []
                         pure_lines = []
                         srt_lines = []
                         vtt_lines = ["WEBVTT\n"]
                         
+                        # Initialize Quote Engine
+                        last_quote_time = time.time()
+                        current_quote = random.choice(motivational_quotes)
+                        status.update(label=f"⏳ {current_quote}")
+                        
                         for i, segment in enumerate(segments, start=1):
+                            
+                            # Rotate quote every 4 seconds
+                            if time.time() - last_quote_time > 4:
+                                current_quote = random.choice(motivational_quotes)
+                                status.update(label=f"⏳ {current_quote}")
+                                last_quote_time = time.time()
+                            
                             # JSON Data
                             start_min, start_sec = divmod(int(segment.start), 60)
                             end_min, end_sec = divmod(int(segment.end), 60)
@@ -265,6 +221,10 @@ with col_controls:
                         st.session_state.vtt_text = "\n".join(vtt_lines)
                         
                         status.update(label="Transcription Complete!", state="complete", expanded=False)
+                        
+                        # Destroy the animation perfectly when finished
+                        visual_loader.empty()
+                        
                         st.rerun() 
                         
                 except Exception as e:
@@ -357,7 +317,7 @@ with col_output:
                             });
                         }
 
-                        // FEATURE 2c: Auto-Scroll (Kept from previous version)
+                        // FEATURE 2c: Auto-Scroll
                         mediaElement.addEventListener('timeupdate', () => {
                             const currentTime = mediaElement.currentTime;
                             // Suspend auto-scroll if user is currently searching
