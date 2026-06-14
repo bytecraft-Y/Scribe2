@@ -412,5 +412,3 @@ with col_output:
             with col_vtt:
                 st.download_button("🌐 Web (VTT)", st.session_state.vtt_text, "Scribe.vtt", "text/plain")
 
-
-make changes in this code
