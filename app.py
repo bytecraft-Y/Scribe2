@@ -79,7 +79,6 @@ with col_controls:
             
             with media_placeholder.container():
                 st.markdown("**Media Preview:**")
-                # Seek back to 0 again for the Streamlit player to read it properly
                 uploaded_file.seek(0)
                 if file_extension.lower() in ['.mp3', '.wav']:
                     st.audio(uploaded_file)
@@ -96,7 +95,6 @@ with col_controls:
             st.markdown("---")
             
             if st.button("🚀 Start Transcription"):
-                # Safe HTML string assignment
                 loader_html = """
                 <style>
                     .wave-container { display: flex; justify-content: center; gap: 8px; margin-bottom: 15px;}
@@ -172,11 +170,12 @@ with col_output:
             st.markdown("### 📄 Real-Time Transcript")
             st.info("👈 Upload & Transcribe to begin.")
         else:
-            st.markdown("<input type='text' id='search-input' placeholder='🔍 Search keywords...' style='width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #E2E8F0;'>", unsafe_allow_html=True)
+            st.markdown("<input type='text' id='search-input' placeholder='🔍 Search keywords...' style='width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #E2E8F0; color: #0F172A;'>", unsafe_allow_html=True)
             
-            html_content = "<div id='transcript-box' style='height: 480px; overflow-y: auto; padding: 15px; background: #F8FAFC; border-radius: 8px;'>"
+            # THE FIX: Added "color: #0F172A;" to the wrapper div so text defaults to dark slate
+            html_content = "<div id='transcript-box' style='height: 480px; overflow-y: auto; padding: 15px; background: #F8FAFC; border-radius: 8px; color: #0F172A;'>"
             for i, seg in enumerate(st.session_state.segments_data):
-                html_content += f"<span class='transcript-segment' id='seg-{i}' data-start='{seg['start']}' data-end='{seg['end']}' style='display:inline-block; padding: 2px 4px; border-radius:4px; cursor:pointer;' title='Click to seek'><strong>{seg['display_time']}</strong> {seg['text']}</span><br>"
+                html_content += f"<span class='transcript-segment' id='seg-{i}' data-start='{seg['start']}' data-end='{seg['end']}' style='display:inline-block; padding: 2px 4px; border-radius:4px; cursor:pointer; color: #0F172A;' title='Click to seek'><strong>{seg['display_time']}</strong> {seg['text']}</span><br>"
             html_content += "</div>"
             st.markdown(html_content, unsafe_allow_html=True)
             
@@ -220,14 +219,20 @@ with col_output:
                             segs.forEach((seg, i)=>{ 
                                 const start=parseFloat(seg.getAttribute('data-start')); 
                                 const end=parseFloat(seg.getAttribute('data-end')); 
+                                
+                                // THE FIX: Explicitly forcing text color changes in JS to override dark mode
                                 if(time>=start && time<=end){ 
                                     seg.style.backgroundColor='#DBEAFE'; 
+                                    seg.style.color='#1D4ED8'; 
+                                    seg.style.fontWeight='bold';
                                     if (activeSegmentId !== i) {
                                         activeSegmentId = i;
                                         seg.scrollIntoView({behavior:'smooth', block:'center'});
                                     }
                                 }else{ 
                                     seg.style.backgroundColor='transparent'; 
+                                    seg.style.color='#0F172A';
+                                    seg.style.fontWeight='normal';
                                 } 
                             }); 
                         }); 
