@@ -105,11 +105,12 @@ with col_controls:
             tmp_media.close() 
             tmp_audio_path = "temp_audio_processing.wav"
             
+            # --- UPDATED MEDIA PREVIEW ---
             st.markdown("**Media Preview:**")
             if file_extension.lower() in ['.mp3', '.wav']:
-                st.audio(tmp_media_path)
+                st.audio(tmp_media_path, key=f"audio_{uploaded_file.name}")
             else:
-                st.video(tmp_media_path)
+                st.video(tmp_media_path, key=f"video_{uploaded_file.name}")
             
             # --- FEATURE 3: VAD Analytics Dashboard ---
             if st.session_state.analytics:
