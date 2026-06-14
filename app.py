@@ -216,7 +216,9 @@ with col_output:
                         
                         # 1. Preprocessing & Tokenization
                         raw_text = " ".join([s['text'] for s in st.session_state.segments_data])
-                        sentences = [s.strip() for s in raw_text.replace('!', '.').replace('?', '.').split('.') if len(s).strip() > 10]
+                        
+                        # THE FIX: len(s.strip()) instead of len(s).strip()
+                        sentences = [s.strip() for s in raw_text.replace('!', '.').replace('?', '.').split('.') if len(s.strip()) > 10]
                         
                         if not sentences:
                             st.session_state.ai_summary = "⚠️ Insufficient transcript data to analyze."
