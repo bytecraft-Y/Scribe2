@@ -5,6 +5,8 @@ import moviepy.editor as mp
 import os
 import tempfile
 import gc
+import time
+import random
 
 # 1. Page Configuration
 st.set_page_config(
@@ -109,7 +111,7 @@ with col_controls:
             else:
                 st.video(tmp_media_path)
             
-            # --- FEATURE 3: VAD Analytics Dashboard ---
+            # --- Analytics Dashboard ---
             if st.session_state.analytics:
                 st.markdown("### 📊 Audio Analytics")
                 m1, m2, m3 = st.columns(3)
@@ -121,7 +123,18 @@ with col_controls:
             
             if st.button("🚀 Start Transcription"):
                 try:
-                    with st.status("Engine Active...", expanded=True) as status:
+                    # --- DYNAMIC LOADER SETUP ---
+                    motivational_quotes = [
+                        "\"Great things are not done by impulse, but by a series of small things brought together.\" — Vincent Van Gogh",
+                        "\"The only way to do great work is to love what you do.\" — Steve Jobs",
+                        "\"Words are, of course, the most powerful drug used by mankind.\" — Rudyard Kipling",
+                        "\"Patience is bitter, but its fruit is sweet.\" — Aristotle",
+                        "\"Focus is the secret of high performance.\" — Unknown",
+                        "Extracting the signal from the noise...",
+                        "Translating acoustic waves into meaning..."
+                    ]
+                    
+                    with st.status("Initializing Engine...", expanded=True) as status:
                         st.write("⏱️ Demuxing media file...")
                         clip = mp.AudioFileClip(tmp_media_path)
                         total_duration = clip.duration
@@ -143,14 +156,24 @@ with col_controls:
                             "dur": f"{int(total_duration // 60)}m {int(total_duration % 60)}s"
                         }
                         
-                        st.write("✍️ Formatting subtitle packages...")
-                        
                         st.session_state.segments_data = []
                         pure_lines = []
                         srt_lines = []
                         vtt_lines = ["WEBVTT\n"]
                         
+                        # --- THE QUOTE ENGINE ---
+                        last_quote_time = time.time()
+                        current_quote = random.choice(motivational_quotes)
+                        status.update(label=f"⏳ {current_quote}")
+                        
                         for i, segment in enumerate(segments, start=1):
+                            
+                            # Check if 4 seconds have passed since the last quote update
+                            if time.time() - last_quote_time > 4:
+                                current_quote = random.choice(motivational_quotes)
+                                status.update(label=f"⏳ {current_quote}")
+                                last_quote_time = time.time()
+                                
                             # JSON Data
                             start_min, start_sec = divmod(int(segment.start), 60)
                             end_min, end_sec = divmod(int(segment.end), 60)
@@ -163,11 +186,8 @@ with col_controls:
                                 "display_time": display_time
                             })
                             
-                            # TXT
                             pure_lines.append(f"{display_time} {segment.text.strip()}")
-                            # SRT
                             srt_lines.append(f"{i}\n{to_srt_time(segment.start)} --> {to_srt_time(segment.end)}\n{segment.text.strip()}\n")
-                            # VTT
                             vtt_lines.append(f"{to_vtt_time(segment.start)} --> {to_vtt_time(segment.end)}\n{segment.text.strip()}\n")
                         
                         st.session_state.pure_text = "\n".join(pure_lines)
@@ -195,10 +215,8 @@ with col_output:
             st.markdown("### 📄 Real-Time Transcript")
             st.info("👈 Upload a file and click 'Start Transcription' to begin.")
         else:
-            # --- FEATURE 2: Search Bar UI ---
             st.markdown("<input type='text' id='search-input' placeholder='🔍 Search keywords in transcript...' style='width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 2px solid #E2E8F0; font-family: sans-serif;'>", unsafe_allow_html=True)
             
-            # Interactive HTML Canvas
             html_content = """
             <div id="transcript-box" style="
                 height: 480px; 
@@ -223,7 +241,6 @@ with col_output:
             html_content += "</div>"
             st.markdown(html_content, unsafe_allow_html=True)
             
-            # --- The Upgraded JavaScript Bridge ---
             js_sync_code = """
             <script>
                 const parentDoc = window.parent.document;
@@ -236,7 +253,6 @@ with col_output:
                     if (mediaElement && segments.length > 0) {
                         clearInterval(syncInterval);
 
-                        // FEATURE 2a: Click-to-Seek
                         segments.forEach(seg => {
                             seg.style.cursor = 'pointer';
                             seg.title = "Click to jump to this moment";
@@ -247,7 +263,6 @@ with col_output:
                             });
                         });
 
-                        // FEATURE 2b: Real-Time Keyword Search
                         if (searchInput) {
                             searchInput.addEventListener('input', (e) => {
                                 const term = e.target.value.toLowerCase();
@@ -255,22 +270,20 @@ with col_output:
                                     if (seg.innerText.toLowerCase().includes(term)) {
                                         seg.style.opacity = '1';
                                         if (term.length > 1) {
-                                            seg.style.backgroundColor = '#FEF08A'; // Yellow highlight
+                                            seg.style.backgroundColor = '#FEF08A';
                                         } else {
-                                            seg.style.backgroundColor = 'transparent'; // Reset if empty
+                                            seg.style.backgroundColor = 'transparent';
                                         }
                                     } else {
-                                        seg.style.opacity = '0.2'; // Dim out non-matches
+                                        seg.style.opacity = '0.2';
                                         seg.style.backgroundColor = 'transparent';
                                     }
                                 });
                             });
                         }
 
-                        // FEATURE 2c: Auto-Scroll (Kept from previous version)
                         mediaElement.addEventListener('timeupdate', () => {
                             const currentTime = mediaElement.currentTime;
-                            // Suspend auto-scroll if user is currently searching
                             if (searchInput && searchInput.value.length > 0) return;
 
                             segments.forEach((seg, index) => {
@@ -300,7 +313,6 @@ with col_output:
             
             st.markdown("<br>", unsafe_allow_html=True)
             
-            # --- FEATURE 1: Professional Subtitle Export UI ---
             st.markdown("**Export Options:**")
             col_txt, col_srt, col_vtt = st.columns(3)
             
