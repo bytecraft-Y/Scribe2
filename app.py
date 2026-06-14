@@ -1,69 +1,27 @@
 import streamlit as st
 from faster_whisper import WhisperModel
 import moviepy.editor as mp
-import google.generativeai as genai
 import os
 import tempfile
 import gc
 
-st.set_page_config(page_title="Advanced Hinglish Transcriber", layout="wide")
-st.title("🌍 Advanced Hinglish Audio Transcriber")
-st.write("Two-Stage Architecture: Faster-Whisper Extraction + LLM Transliteration.")
+st.set_page_config(page_title="Lightning Media Transcriber", layout="wide")
+st.title("⚡ High-Speed Transcription Assistant")
+st.write("Powered by faster-whisper and INT8 CPU quantization.")
 
-# --- API Security Sidebar ---
-with st.sidebar:
-    st.header("⚙️ System Configuration")
-    st.write("An API key is required to convert Hindi script to English letters (Romanized Hinglish).")
-    api_key = st.text_input("Enter Gemini API Key", type="password")
-    st.markdown("[Get a free API key here](https://aistudio.google.com/app/apikey)")
-
-# 1. Load the Audio Extraction Engine
+# 1. Load the Optimized CTranslate2 Model
 @st.cache_resource
-def load_whisper():
+def load_model():
+    # INT8 quantization makes the model run up to 4x faster on CPU
     return WhisperModel("tiny", device="cpu", compute_type="int8")
 
-whisper_model = load_whisper()
+model = load_model()
 
-# 2. The LLM Transliteration Agent
-def convert_to_roman_hinglish(raw_text, key):
-    genai.configure(api_key=key)
-    
-    # --- THE FIX: Dynamic Model Routing ---
-    # Query Google's servers to return only the models active on your account
-    available_models = [
-        m.name for m in genai.list_models() 
-        if 'generateContent' in m.supported_generation_methods
-    ]
-    
-    if not available_models:
-        return "API Error: No valid generative models are authorized for this API key."
-        
-    # Automatically hunt for the newest 'flash' model, fallback to the first valid one
-    target_model = next((m for m in available_models if 'flash' in m), available_models[0])
-    
-    # Pass the verified, active model directly to the generator
-    llm = genai.GenerativeModel(target_model) 
-    
-    system_prompt = (
-        "You are a strict transliteration engine. Your job is to take mixed Hindi/English text "
-        "and rewrite it completely in Roman letters (the English alphabet). "
-        "DO NOT translate the Hindi words to English words. Keep the exact phonetic Hinglish vocabulary. "
-        "Example Input: आज हम machine learning सीखेंगे "
-        "Example Output: Aaj hum machine learning seekhenge \n\n"
-        f"Text to convert:\n{raw_text}"
-    )
-    
-    response = llm.generate_content(system_prompt)
-    return response.text
-# --- File Processing ---
+# 2. File Upload Handling
 SUPPORTED_FORMATS = ["mp3", "wav", "mp4", "ts", "mov", "mkv", "avi"]
 uploaded_file = st.file_uploader("Select Media File", type=SUPPORTED_FORMATS)
 
 if uploaded_file is not None:
-    if not api_key:
-        st.warning("⚠️ Please enter your Gemini API key in the sidebar to enable processing.")
-        st.stop()
-
     file_extension = os.path.splitext(uploaded_file.name)[1]
     
     tmp_media = tempfile.NamedTemporaryFile(delete=False, suffix=file_extension)
@@ -71,49 +29,40 @@ if uploaded_file is not None:
     tmp_media_path = tmp_media.name
     tmp_media.close() 
 
-    st.info("File uploaded. Initiating Two-Stage Pipeline...")
+    st.info("File uploaded successfully. Processing media...")
     tmp_audio_path = "temp_audio_processing.wav"
 
     try:
-        # Phase 1: Audio Extraction
-        with st.spinner("Stage 1: Extracting audio track..."):
+        # Phase 1: Fast Audio Extraction
+        with st.spinner("Extracting audio track..."):
             clip = mp.AudioFileClip(tmp_media_path)
+            # Reduce sampling rate directly during extraction to save processing time later
             clip.write_audiofile(tmp_audio_path, fps=16000, logger=None)
             clip.close()
             
-        # Phase 2: Whisper Raw Text Generation
-        with st.spinner("Stage 2: Running Whisper AI Extraction..."):
-            segments, _ = whisper_model.transcribe(
-                tmp_audio_path, 
-                beam_size=5,
-                language="hi", # Force Hindi mode to capture the vocabulary perfectly
-                condition_on_previous_text=True 
+        # Phase 2: High-Speed Transcription
+        with st.spinner("Generating transcript at high speed..."):
+            # beam_size=5 balances speed and accuracy
+            segments, info = model.transcribe(tmp_audio_path, beam_size=5)
+            
+            # Faster-whisper returns a generator, so we iterate through it
+            transcript_text = " ".join([segment.text for segment in segments])
+            
+            st.success("Transcription Complete!")
+            st.text_area("Transcript", transcript_text, height=300)
+            
+            st.download_button(
+                label="📥 Download Transcript as TXT",
+                data=transcript_text,
+                file_name="transcript.txt",
+                mime="text/plain"
             )
-            raw_mixed_text = " ".join([segment.text for segment in segments])
-            
-        # Phase 3: LLM Script Conversion
-        with st.spinner("Stage 3: Transliterating Devanagari to Roman Hinglish..."):
-            final_hinglish_text = convert_to_roman_hinglish(raw_mixed_text, api_key)
-            
-        st.success("Pipeline Execution Complete!")
-        
-        # Display Results
-        st.text_area("Final Romanized Hinglish Output", final_hinglish_text, height=300)
-        
-        with st.expander("View Raw Extraction Data (Debug Mode)"):
-            st.write(raw_mixed_text)
-            
-        st.download_button(
-            label="📥 Download as TXT",
-            data=final_hinglish_text,
-            file_name="hinglish_transcript.txt",
-            mime="text/plain"
-        )
             
     except Exception as e:
         st.error(f"A processing error occurred: {str(e)}")
         
     finally:
+        # 3. Aggressive Server Cleanup
         if os.path.exists(tmp_media_path):
             os.remove(tmp_media_path)
         if os.path.exists(tmp_audio_path):
