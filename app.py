@@ -40,21 +40,19 @@ if uploaded_file is not None:
             clip.write_audiofile(tmp_audio_path, fps=16000, logger=None)
             clip.close()
             
-        # Phase 2: High-Speed Transcription
+        # Phase 2: High-Speed Transcription with Timestamps
         with st.spinner("Generating transcript at high speed..."):
             # beam_size=5 balances speed and accuracy
             segments, info = model.transcribe(tmp_audio_path, beam_size=5)
             
-           # Extract timestamps and format them cleanly
-transcript_lines = []
-for segment in segments:
-    # Convert raw seconds into a clean [Start -> End] format
-    start_time = f"{segment.start:.2f}s"
-    end_time = f"{segment.end:.2f}s"
-    transcript_lines.append(f"[{start_time} -> {end_time}] {segment.text.strip()}")
-
-# Join the lines with a line break so it stacks neatly in the text area
-transcript_text = "\n".join(transcript_lines)
+            # --- The new timestamp formatting block ---
+            transcript_lines = []
+            for segment in segments:
+                start_time = f"{segment.start:.2f}s"
+                end_time = f"{segment.end:.2f}s"
+                transcript_lines.append(f"[{start_time} -> {end_time}] {segment.text.strip()}")
+            
+            transcript_text = "\n".join(transcript_lines)
             
             st.success("Transcription Complete!")
             st.text_area("Transcript", transcript_text, height=300)
