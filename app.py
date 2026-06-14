@@ -84,6 +84,8 @@ with col_controls:
         
         tmp_media_path = None
         tmp_audio_path = None
+
+media_placeholder = st.empty()
         
         # Initialize session states
         if 'segments_data' not in st.session_state:
