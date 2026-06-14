@@ -207,62 +207,86 @@ with col_output:
                 col_vtt.download_button("🌐 VTT", st.session_state.vtt_text, "Scribe.vtt")
 # --- TAB 2: AI INSIGHTS ---
             with tab_ai:
-                st.markdown("### 🧠 Automated Knowledge Extraction")
-                st.write("Generate a structured executive summary, extract action items, and identify key decisions using Large Language Models.")
+                st.markdown("### 🧠 Edge-AI Semantic Analyzer")
+                st.write("This engine runs entirely local and offline using statistical parsing to extract summary metrics, action items, and key decisions.")
                 
-                # Enterprise Security: Secure API Key Input
-                st.markdown("<br>", unsafe_allow_html=True)
-                api_key = st.text_input("🔑 Enter your Gemini API Key to unlock AI Insights:", type="password", help="Get a free key at aistudio.google.com")
-                
-                if st.button("✨ Generate Smart Summary", type="primary"):
-                    if not api_key:
-                        st.error("⚠️ Please enter a valid API key to proceed.")
-                    else:
-                        with st.spinner("Analyzing semantic structure and extracting insights..."):
-                            try:
-                                # Dynamic Import so the app doesn't break if the module is missing
-                                import google.generativeai as genai
+                if st.button("✨ Execute Local NLP Pipeline", type="primary"):
+                    with st.spinner("Processing local text matrix..."):
+                        time.sleep(0.8)  # Smooth UI transition
+                        
+                        # 1. Preprocessing & Tokenization
+                        raw_text = " ".join([s['text'] for s in st.session_state.segments_data])
+                        sentences = [s.strip() for s in raw_text.replace('!', '.').replace('?', '.').split('.') if len(s).strip() > 10]
+                        
+                        if not sentences:
+                            st.session_state.ai_summary = "⚠️ Insufficient transcript data to analyze."
+                        else:
+                            # 2. Statistical Sentence Ranking (Extractive Summarization)
+                            stop_words = set(["the", "a", "an", "and", "or", "but", "if", "then", "of", "to", "in", "is", "it", "you", "that", "this", "was", "for", "on", "as", "with"])
+                            words = [w.lower().strip(".,!?\"") for w in raw_text.split() if w.lower().strip(".,!?\"") not in stop_words]
+                            
+                            # Calculate word frequencies
+                            freq_dict = {}
+                            for w in words:
+                                freq_dict[w] = freq_dict.get(w, 0) + 1
+                            
+                            # Score sentences based on word frequencies
+                            sent_scores = {}
+                            for sent in sentences:
+                                for word in sent.lower().split():
+                                    if word in freq_dict:
+                                        sent_scores[sent] = sent_scores.get(sent, 0) + freq_dict[word]
+                            
+                            # Sort and pick top 3 sentences for the Executive Summary
+                            top_sentences = sorted(sent_scores, key=sent_scores.get, reverse=True)[:3]
+                            
+                            # 3. Heuristic Semantic Parsing (Action Items & Decisions)
+                            action_triggers = ["need to", "have to", "will", "should", "must", "task", "assign", "todo", "action", "fix", "update"]
+                            decision_triggers = ["decided", "agreed", "concluded", "choose", "settled", "resolved", "instead of"]
+                            
+                            extracted_actions = []
+                            extracted_decisions = []
+                            
+                            for sent in sentences:
+                                sent_lower = sent.lower()
+                                # Check for actions
+                                if any(trigger in sent_lower for trigger in action_triggers):
+                                    if sent not in extracted_actions and len(extracted_actions) < 4:
+                                        extracted_actions.append(sent)
+                                # Check for decisions
+                                if any(trigger in sent_lower for trigger in decision_triggers):
+                                    if sent not in extracted_decisions and len(extracted_decisions) < 3:
+                                        extracted_decisions.append(sent)
+                            
+                            # 4. Compile Structured Markdown Output
+                            output = "### 📌 Executive Summary\n"
+                            for s in top_sentences:
+                                output += f"* {s}.\n"
                                 
-                                # Configure the AI
-                                genai.configure(api_key=api_key)
-                                llm = genai.GenerativeModel('gemini-1.5-flash')
+                            output += "\n### ✅ Extracted Action Items\n"
+                            if extracted_actions:
+                                for a in extracted_actions:
+                                    output += f"* {a}.\n"
+                            else:
+                                output += "* No explicit action items or tasks detected in the audio narrative.\n"
                                 
-                                # Advanced Prompt Engineering
-                                sys_prompt = f"""
-                                You are an elite executive assistant. Analyze the following transcript and extract the business value. 
-                                Format your response strictly using Markdown with these exact sections:
+                            output += "\n### 💡 Key Decisions & Core Insights\n"
+                            if extracted_decisions:
+                                for d in extracted_decisions:
+                                    output += f"* {d}.\n"
+                            else:
+                                output += "* No explicit corporate decisions or conclusions flagged.\n"
                                 
-                                ### 📌 Executive Summary
-                                (Provide a concise, 3-sentence summary of the core discussion.)
-                                
-                                ### ✅ Action Items
-                                (Provide a bulleted list of specific tasks, next steps, or assignments mentioned. If none, state 'No clear action items detected.')
-                                
-                                ### 💡 Key Decisions & Insights
-                                (Highlight the 2-3 most important takeaways, agreements, or data points discussed.)
-                                
-                                Transcript to analyze:
-                                {st.session_state.pure_text}
-                                """
-                                
-                                # Execute AI Call
-                                response = llm.generate_content(sys_prompt)
-                                st.session_state.ai_summary = response.text
-                                
-                            except ImportError:
-                                st.error("Missing dependency. Please run: pip install google-generativeai")
-                            except Exception as e:
-                                st.error(f"API Error: {str(e)}")
-                
-                # Render the Output Beautifully
+                            st.session_state.ai_summary = output
+
+                # Render Output Card
                 if st.session_state.ai_summary:
-                    st.markdown("<div style='background: #F8FAFC; padding: 25px; border-radius: 8px; border-left: 5px solid #8B5CF6; color: #0F172A; margin-top: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>", unsafe_allow_html=True)
+                    st.markdown("<div style='background: #F8FAFC; padding: 25px; border-radius: 8px; border-left: 5px solid #06B6D4; color: #0F172A; margin-top: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>", unsafe_allow_html=True)
                     st.markdown(st.session_state.ai_summary)
                     st.markdown("</div>", unsafe_allow_html=True)
                     
-                    # Add a quick-copy button for the user to export the AI summary
                     st.markdown("<br>", unsafe_allow_html=True)
-                    st.download_button("📥 Download Executive Brief", st.session_state.ai_summary, "Executive_Brief.md", "text/markdown")
+                    st.download_button("📥 Download Analysis Brief", st.session_state.ai_summary, "Local_Analysis_Brief.md", "text/markdown")
 # ==========================================
 # JAVASCRIPT BRIDGE (Precise Regex & Auto-Scroll)
 # ==========================================
