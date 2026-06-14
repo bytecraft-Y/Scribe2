@@ -109,15 +109,16 @@ with col_controls:
             tmp_media.close() 
             tmp_audio_path = "temp_audio_processing.wav"
             
-            # Render the media inside the placeholder
+           # Render the media inside the placeholder
             with media_placeholder.container():
                 st.markdown("**Media Preview:**")
                 
-                # ANTI-GHOSTING FIX 3: Unique keys based on filename
+                # THE FIX: Pass the uploaded_file object directly instead of the temp path.
+                # Streamlit creates a unique Blob URL for the object, naturally killing the ghosting.
                 if file_extension.lower() in ['.mp3', '.wav']:
-                    st.audio(tmp_media_path, key=f"audio_{uploaded_file.name}")
+                    st.audio(uploaded_file)
                 else:
-                    st.video(tmp_media_path, key=f"video_{uploaded_file.name}")
+                    st.video(uploaded_file)
             
             # --- FEATURE 3: VAD Analytics Dashboard ---
             if st.session_state.analytics:
