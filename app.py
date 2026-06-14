@@ -96,16 +96,29 @@ with col_controls:
             st.session_state.vtt_text = ""
         if 'analytics' not in st.session_state:
             st.session_state.analytics = None
-        
         if uploaded_file is not None:
             file_extension = os.path.splitext(uploaded_file.name)[1]
             tmp_media = tempfile.NamedTemporaryFile(delete=False, suffix=file_extension)
-            tmp_media.write(uploaded_file.read())
+            tmp_media.write(uploaded_file.read()); tmp_media.close()
             tmp_media_path = tmp_media.name
-            tmp_media.close() 
-            tmp_audio_path = "temp_audio_processing.wav"
             
+            # --- FIXED MEDIA PLAYER ---
             st.markdown("**Media Preview:**")
+            # Using unique keys forces the player to re-render, killing the previous one
+            if file_extension.lower() in ['.mp3', '.wav']:
+                st.audio(tmp_media_path, key=f"audio_{uploaded_file.name}")
+            else:
+                st.video(tmp_media_path, key=f"video_{uploaded_file.name}")
+            
+            # --- Analytics Dashboard ---
+            if st.session_state.analytics:
+                st.markdown("#### 📊 Performance Metrics")
+                m1, m2, m3 = st.columns(3)
+                m1.metric("Lang", st.session_state.analytics['lang'])
+                m2.metric("Conf", st.session_state.analytics['conf'])
+                m3.metric("Dur", st.session_state.analytics['dur'])
+            
+                st.markdown("**Media Preview:**")
             if file_extension.lower() in ['.mp3', '.wav']:
                 st.audio(tmp_media_path)
             else:
