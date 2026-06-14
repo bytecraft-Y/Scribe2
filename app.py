@@ -189,10 +189,12 @@ with col_output:
                 // Reach out of the iframe to find the Streamlit parent document
                 const parentDoc = window.parent.document;
                 
-                // Set an interval to find the media element (it sometimes loads a second later)
                 let syncInterval = setInterval(() => {
                     const mediaElement = parentDoc.querySelector('video, audio');
                     const segments = parentDoc.querySelectorAll('.transcript-segment');
+                    
+                    // NEW: Keep track of which segment is currently active
+                    let activeSegmentId = null;
                     
                     if (mediaElement && segments.length > 0) {
                         clearInterval(syncInterval); // Found it, stop polling
@@ -200,17 +202,24 @@ with col_output:
                         mediaElement.addEventListener('timeupdate', () => {
                             const currentTime = mediaElement.currentTime;
                             
-                            segments.forEach(seg => {
+                            segments.forEach((seg, index) => {
                                 const start = parseFloat(seg.getAttribute('data-start'));
                                 const end = parseFloat(seg.getAttribute('data-end'));
                                 
-                                // If the media is currently playing this segment, highlight it
                                 if (currentTime >= start && currentTime <= end) {
-                                    seg.style.backgroundColor = '#DBEAFE'; // Light Blue
-                                    seg.style.color = '#1D4ED8'; // Dark Blue text
+                                    // Highlight active text
+                                    seg.style.backgroundColor = '#DBEAFE'; 
+                                    seg.style.color = '#1D4ED8'; 
                                     seg.style.fontWeight = 'bold';
+                                    
+                                    // NEW: Auto-scroll logic
+                                    // If we just entered a NEW segment, scroll it smoothly to the center
+                                    if (activeSegmentId !== index) {
+                                        activeSegmentId = index;
+                                        seg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                    }
                                 } else {
-                                    // Reset when the media passes
+                                    // Reset inactive text
                                     seg.style.backgroundColor = 'transparent';
                                     seg.style.color = '#0F172A';
                                     seg.style.fontWeight = 'normal';
@@ -220,8 +229,7 @@ with col_output:
                     }
                 }, 1000);
             </script>
-            """
-            # Render the invisible script
+            """            # Render the invisible script
             components.html(js_sync_code, height=0, width=0)
             
             st.markdown("<br>", unsafe_allow_html=True)
