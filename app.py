@@ -6,6 +6,9 @@ import tempfile
 import gc
 import time
 import random
+import re       # <-- NEW: For exact word matching
+import math     # <-- NEW: For TF-IDF calculations
+from collections import Counter # <-- NEW: For frequency analysis
 
 # 1. Page Configuration
 st.set_page_config(
@@ -207,75 +210,91 @@ with col_output:
                 col_vtt.download_button("🌐 VTT", st.session_state.vtt_text, "Scribe.vtt")
 # --- TAB 2: AI INSIGHTS ---
             with tab_ai:
-                st.markdown("### 🧠 Edge-AI Semantic Analyzer")
-                st.write("This engine runs entirely local and offline using statistical parsing to extract summary metrics, action items, and key decisions.")
+                st.markdown("### 🧠 Edge-AI Semantic Analyzer (TF-IDF)")
+                st.write("This offline engine utilizes Term Frequency-Inverse Document Frequency (TF-IDF) and Regex heuristic parsing to extract highly accurate corporate intelligence.")
                 
-                if st.button("✨ Generate Insights", type="primary"):
-                    with st.spinner("Processing local text matrix..."):
-                        time.sleep(0.8)  # Smooth UI transition
+                if st.button("✨ Execute Local NLP Pipeline", type="primary"):
+                    with st.spinner("Calculating TF-IDF matrices & extracting vectors..."):
+                        time.sleep(0.5) 
                         
-                        # 1. Preprocessing & Tokenization
                         raw_text = " ".join([s['text'] for s in st.session_state.segments_data])
-                        
-                        # THE FIX: len(s.strip()) instead of len(s).strip()
-                        sentences = [s.strip() for s in raw_text.replace('!', '.').replace('?', '.').split('.') if len(s.strip()) > 10]
+                        # Robust sentence splitting
+                        sentences = [s.strip() for s in re.split(r'[.!?]', raw_text) if len(s.strip()) > 20]
                         
                         if not sentences:
-                            st.session_state.ai_summary = "⚠️ Insufficient transcript data to analyze."
+                            st.session_state.ai_summary = "⚠️ Insufficient transcript data to analyze. Please provide a longer audio file."
                         else:
-                            # 2. Statistical Sentence Ranking (Extractive Summarization)
-                            stop_words = set(["the", "a", "an", "and", "or", "but", "if", "then", "of", "to", "in", "is", "it", "you", "that", "this", "was", "for", "on", "as", "with"])
-                            words = [w.lower().strip(".,!?\"") for w in raw_text.split() if w.lower().strip(".,!?\"") not in stop_words]
+                            # 1. ADVANCED SUMMARIZATION (TF-IDF Algorithm)
+                            stop_words = set(["the", "a", "an", "and", "or", "but", "if", "then", "of", "to", "in", "is", "it", "you", "that", "this", "was", "for", "on", "as", "with", "so", "we", "they", "i", "are", "be", "have"])
                             
-                            # Calculate word frequencies
-                            freq_dict = {}
-                            for w in words:
-                                freq_dict[w] = freq_dict.get(w, 0) + 1
-                            
-                            # Score sentences based on word frequencies
-                            sent_scores = {}
+                            # Calculate Document Frequency (DF)
+                            df = Counter()
+                            sent_tokens = []
                             for sent in sentences:
-                                for word in sent.lower().split():
-                                    if word in freq_dict:
-                                        sent_scores[sent] = sent_scores.get(sent, 0) + freq_dict[word]
+                                # Extract clean words using regex
+                                tokens = [w.lower() for w in re.findall(r'\b\w+\b', sent) if w.lower() not in stop_words]
+                                sent_tokens.append(tokens)
+                                for token in set(tokens):
+                                    df[token] += 1
                             
-                            # Sort and pick top 3 sentences for the Executive Summary
-                            top_sentences = sorted(sent_scores, key=sent_scores.get, reverse=True)[:3]
+                            # Calculate TF-IDF Score per sentence
+                            N = len(sentences)
+                            sent_scores = []
+                            global_tf_idf = Counter()
                             
-                            # 3. Heuristic Semantic Parsing (Action Items & Decisions)
-                            action_triggers = ["need to", "have to", "will", "should", "must", "task", "assign", "todo", "action", "fix", "update"]
-                            decision_triggers = ["decided", "agreed", "concluded", "choose", "settled", "resolved", "instead of"]
+                            for i, tokens in enumerate(sent_tokens):
+                                score = 0
+                                tf = Counter(tokens)
+                                if len(tokens) > 0:
+                                    for token, count in tf.items():
+                                        # Inverse Document Frequency math
+                                        idf = math.log(N / (1 + df[token]))
+                                        tf_idf_val = (count / len(tokens)) * idf
+                                        score += tf_idf_val
+                                        global_tf_idf[token] += tf_idf_val
+                                        
+                                sent_scores.append((score, i, sentences[i]))
+                            
+                            # Extract Top 3 sentences based on score
+                            top_scored_sents = sorted(sent_scores, key=lambda x: x[0], reverse=True)[:3]
+                            # Re-sort them chronologically (by their original index) so the summary reads naturally
+                            chronological_summary = sorted(top_scored_sents, key=lambda x: x[1])
+                            
+                            # Extract Top 5 Keywords for auto-tagging
+                            top_keywords = [word for word, score in global_tf_idf.most_common(5)]
+                            
+                            # 2. PRECISION HEURISTIC PARSING (Regex)
+                            # Using \b to ensure we only match exact words (e.g., matching "must" but ignoring "mustard")
+                            action_pattern = re.compile(r'\b(need to|have to|will|should|must|task|assign|todo|action item|fix|update)\b', re.IGNORECASE)
+                            decision_pattern = re.compile(r'\b(decided|agreed|concluded|choose|settled|resolved|instead of)\b', re.IGNORECASE)
                             
                             extracted_actions = []
                             extracted_decisions = []
                             
                             for sent in sentences:
-                                sent_lower = sent.lower()
-                                # Check for actions
-                                if any(trigger in sent_lower for trigger in action_triggers):
-                                    if sent not in extracted_actions and len(extracted_actions) < 4:
-                                        extracted_actions.append(sent)
-                                # Check for decisions
-                                if any(trigger in sent_lower for trigger in decision_triggers):
-                                    if sent not in extracted_decisions and len(extracted_decisions) < 3:
-                                        extracted_decisions.append(sent)
+                                if action_pattern.search(sent) and sent not in extracted_actions and len(extracted_actions) < 4:
+                                    extracted_actions.append(sent)
+                                if decision_pattern.search(sent) and sent not in extracted_decisions and len(extracted_decisions) < 3:
+                                    extracted_decisions.append(sent)
                             
-                            # 4. Compile Structured Markdown Output
-                            output = "### 📌 Executive Summary\n"
-                            for s in top_sentences:
-                                output += f"* {s}.\n"
+                            # 3. COMPILE ENTERPRISE REPORT
+                            output = f"**🏷️ Auto-Generated Tags:** {', '.join([k.capitalize() for k in top_keywords])}\n\n---\n"
+                            
+                            output += "### 📌 Executive Summary\n"
+                            for _, _, s in chronological_summary:
+                                output += f"{s.capitalize()}.\n"
                                 
                             output += "\n### ✅ Extracted Action Items\n"
                             if extracted_actions:
                                 for a in extracted_actions:
-                                    output += f"* {a}.\n"
+                                    output += f"* {a.capitalize()}.\n"
                             else:
                                 output += "* No explicit action items or tasks detected in the audio narrative.\n"
                                 
                             output += "\n### 💡 Key Decisions & Core Insights\n"
                             if extracted_decisions:
                                 for d in extracted_decisions:
-                                    output += f"* {d}.\n"
+                                    output += f"* {d.capitalize()}.\n"
                             else:
                                 output += "* No explicit corporate decisions or conclusions flagged.\n"
                                 
