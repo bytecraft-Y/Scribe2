@@ -27,8 +27,9 @@ whisper_model = load_whisper()
 # 2. The LLM Transliteration Agent
 def convert_to_roman_hinglish(raw_text, key):
     genai.configure(api_key=key)
-    # Using the flash model because it is incredibly fast and cheap/free
-    llm = genai.GenerativeModel('gemini-1.5-flash') 
+    
+    # --- CHANGED: Use the universally stable 'gemini-pro' endpoint ---
+    llm = genai.GenerativeModel('gemini-pro') 
     
     system_prompt = (
         "You are a strict transliteration engine. Your job is to take mixed Hindi/English text "
@@ -41,7 +42,6 @@ def convert_to_roman_hinglish(raw_text, key):
     
     response = llm.generate_content(system_prompt)
     return response.text
-
 # --- File Processing ---
 SUPPORTED_FORMATS = ["mp3", "wav", "mp4", "ts", "mov", "mkv", "avi"]
 uploaded_file = st.file_uploader("Select Media File", type=SUPPORTED_FORMATS)
