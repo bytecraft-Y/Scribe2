@@ -6,8 +6,8 @@ import tempfile
 import gc
 
 st.set_page_config(page_title="Global Media Transcriber", layout="wide")
-st.title("🌍 Multilingual Transcription Assistant")
-st.write("Powered by faster-whisper. Supports 99+ languages including native code-switching.")
+st.title("🌍 Multilingual & Hinglish Optimized Transcriber")
+st.write("Powered by faster-whisper with advanced tokenization bias for code-switched audio.")
 
 # 1. Load the Optimized CTranslate2 Model
 @st.cache_resource
@@ -16,37 +16,30 @@ def load_model():
 
 model = load_model()
 
-# --- NEW: Language & Task Configuration UI ---
+# --- Language & Task Configuration UI ---
 st.markdown("### Transcription Settings")
 col1, col2 = st.columns(2)
 
 with col1:
-    # A mapped dictionary to pass the correct ISO language code to the model
     LANGUAGE_OPTIONS = {
         "Auto-Detect Language": None,
+        "Hinglish / Hindi (Phonetic Mixed)": "hi",
         "English": "en",
-        "Hindi (Best for Hinglish)": "hi",
         "Spanish": "es",
         "French": "fr",
-        "German": "de",
-        "Chinese": "zh",
-        "Japanese": "ja",
-        "Russian": "ru",
-        "Portuguese": "pt"
+        "German": "de"
     }
     selected_lang_label = st.selectbox("Audio Language", list(LANGUAGE_OPTIONS.keys()))
     lang_code = LANGUAGE_OPTIONS[selected_lang_label]
 
 with col2:
-    # Determine if the user wants the original text or translated English text
     mode_selection = st.radio(
         "Output Mode", 
-        ["Transcribe (Keep original language)", "Translate (Force output to English)"]
+        ["Transcribe (Keep Hinglish/Original text)", "Translate (Convert everything to pure English)"]
     )
     task_code = "translate" if "Translate" in mode_selection else "transcribe"
 
 st.markdown("---")
-# ---------------------------------------------
 
 # 2. File Upload Handling
 SUPPORTED_FORMATS = ["mp3", "wav", "mp4", "ts", "mov", "mkv", "avi"]
@@ -72,21 +65,30 @@ if uploaded_file is not None:
             
         # Phase 2: High-Speed Multilingual Transcription
         with st.spinner(f"Running {task_code} engine..."):
-            # Pass the user's UI selections directly into the inference engine
+            
+            # --- NEW: Hinglish-Specific Prompt Injection ---
+            # Providing a code-switched baseline context forces Whisper to accept English words 
+            # embedded inside Hindi sentences without hallucinating punctuation or dropping terms.
+            hinglish_prompt = (
+                "Aacha, toh aaj is video mein hum baat karenge engineering models ke baare mein. "
+                "Let's get started. Yeh configuration code perfectly fine chal rha hai, okay?"
+            )
+            
             segments, info = model.transcribe(
                 tmp_audio_path, 
                 beam_size=5,
                 language=lang_code,
-                task=task_code
+                task=task_code,
+                initial_prompt=hinglish_prompt if lang_code == "hi" else None,
+                condition_on_previous_text=True  # Helps maintain style consistency across audio chunks
             )
             
-            # If auto-detect was used, show the user what language the AI found
             if lang_code is None:
                 st.success(f"Language Detected: **{info.language.upper()}** (Probability: {info.language_probability:.2f})")
             else:
                 st.success("Processing Complete!")
             
-            # Compile the text
+            # Compile the text segments cleanly
             transcript_text = " ".join([segment.text for segment in segments])
             
             st.text_area("Output", transcript_text, height=300)
