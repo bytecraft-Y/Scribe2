@@ -155,7 +155,56 @@ with col_controls:
                         "\"Words are, of course, the most powerful drug used by mankind.\" — Rudyard Kipling",
                         "Extracting the signal from the noise...",
                         "Translating acoustic waves into meaning..."
-                    ]
+                    
+    "\"The secret of getting ahead is getting started.\" — Mark Twain",
+    "\"Well begun is half done.\" — Aristotle",
+    "\"Dream big and dare to fail.\" — Norman Vaughan",
+    "\"What you do today can improve all your tomorrows.\" — Ralph Marston",
+    "\"Perfection is achieved not when there is nothing more to add, but when there is nothing left to take away.\" — Antoine de Saint-Exupéry",
+    "\"The best preparation for tomorrow is doing your best today.\" — H. Jackson Brown Jr.",
+    "\"Creativity is intelligence having fun.\" — Albert Einstein",
+    "\"Make it simple, but significant.\" — Don Draper",
+    "\"The harder I work, the luckier I get.\" — Samuel Goldwyn",
+    "\"Focus on being productive instead of busy.\" — Tim Ferriss",
+    "\"Every strike brings me closer to the next home run.\" — Babe Ruth",
+    "\"Discipline is choosing between what you want now and what you want most.\" — Abraham Lincoln",
+    "\"You miss 100% of the shots you don't take.\" — Wayne Gretzky",
+    "\"If opportunity doesn't knock, build a door.\" — Milton Berle",
+    "\"The expert in anything was once a beginner.\" — Helen Hayes",
+
+    "\"Initializing auditory perception modules...\"",
+    "\"Listening for patterns in the spectrum...\"",
+    "\"Converting spoken language into structured data...\"",
+    "\"Mapping frequencies to meaning...\"",
+    "\"Synchronizing with incoming audio streams...\"",
+    "\"Detecting linguistic signals...\"",
+    "\"Aligning phonemes with context...\"",
+    "\"Parsing the soundscape...\"",
+    "\"Resolving ambiguity in real time...\"",
+    "\"Building understanding from waveforms...\"",
+    "\"Following the rhythm of human speech...\"",
+    "\"Tracking intent across every syllable...\"",
+    "\"Transforming audio into knowledge...\"",
+    "\"Recognizing voices, extracting meaning...\"",
+    "\"Calibrating language understanding systems...\"",
+    "\"Reading between the pauses...\"",
+    "\"Listening for what matters most...\"",
+    "\"Converting noise into narrative...\"",
+    "\"Analyzing speech with precision...\"",
+    "\"Turning sound into searchable insight...\"",
+
+    "\"Mining meaning from every decibel...\"",
+    "\"Distilling intelligence from audio streams...\"",
+    "\"Understanding begins with listening...\"",
+    "\"The signal is there. Finding it...\"",
+    "\"Interpreting the language hidden in sound...\"",
+    "\"Every waveform tells a story...\"",
+    "\"Capturing context, one word at a time...\"",
+    "\"Listening deeply. Understanding accurately...\"",
+    "\"Discovering intent beneath the acoustics...\"",
+    "\"Making sense of the spoken world...\""
+]
+                    
                     
                     with st.status("Engine Active...", expanded=True) as status:
                         st.write("⏱️ Demuxing media file...")
