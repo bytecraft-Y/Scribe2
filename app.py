@@ -60,7 +60,6 @@ with col_controls:
         if 'segments_data' not in st.session_state: 
             st.session_state.update({'segments_data': [], 'pure_text': '', 'srt_text': '', 'vtt_text': '', 'analytics': None})
         
-        # --- THE FIX: Total System Reset on File Removal ---
         if uploaded_file is None:
             media_placeholder.empty()
             st.session_state.analytics = None
@@ -69,13 +68,19 @@ with col_controls:
             st.session_state.srt_text = ""
             st.session_state.vtt_text = ""
         else:
+            # --- THE FIX: Rewind the file pointer before reading ---
+            uploaded_file.seek(0)
+            
             file_extension = os.path.splitext(uploaded_file.name)[1]
             tmp_media = tempfile.NamedTemporaryFile(delete=False, suffix=file_extension)
-            tmp_media.write(uploaded_file.read()); tmp_media.close()
+            tmp_media.write(uploaded_file.read())
+            tmp_media.close()
             tmp_media_path = tmp_media.name
             
             with media_placeholder.container():
                 st.markdown("**Media Preview:**")
+                # Need to seek back to 0 again for the Streamlit player to read it properly
+                uploaded_file.seek(0)
                 st.audio(uploaded_file) if file_extension.lower() in ['.mp3', '.wav'] else st.video(uploaded_file)
             
             if st.session_state.analytics:
@@ -86,7 +91,6 @@ with col_controls:
             st.markdown("---")
             
             if st.button("🚀 Start Transcription"):
-                # Loader HTML
                 loader_html = """<style>.wave-container { display: flex; justify-content: center; gap: 8px; margin-bottom: 15px;}.wave-bar { width: 8px; height: 16px; background: #3B82F6; border-radius: 8px; animation: pulse 1.2s infinite; } @keyframes pulse { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(2.5); } }</style><div class="wave-container"><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div></div>"""
                 visual_loader = st.empty(); visual_loader.markdown(loader_html, unsafe_allow_html=True)
                 
@@ -99,8 +103,19 @@ with col_controls:
                         
                         st.session_state.segments_data, pure_lines, srt_lines, vtt_lines = [], [], [], ["WEBVTT\n"]
                         last_quote = time.time()
+                        
+                        motivational_quotes = [
+                            "\"Great things are not done by impulse...\" — Vincent Van Gogh",
+                            "\"The only way to do great work is to love what you do.\" — Steve Jobs",
+                            "Extracting the signal from the noise...",
+                            "Translating acoustic waves into meaning...",
+                            "\"The secret of getting ahead is getting started.\" — Mark Twain"
+                        ]
+                        
                         for i, seg in enumerate(segments, 1):
-                            if time.time() - last_quote > 4: status.update(label=f"⏳ Processing...", expanded=True); last_quote = time.time()
+                            if time.time() - last_quote > 4: 
+                                status.update(label=f"⏳ {random.choice(motivational_quotes)}", expanded=True)
+                                last_quote = time.time()
                             start_fmt = f"[{int(seg.start)//60:02d}:{int(seg.start)%60:02d} -> {int(seg.end)//60:02d}:{int(seg.end)%60:02d}]"
                             st.session_state.segments_data.append({"start": seg.start, "end": seg.end, "text": seg.text.strip(), "display_time": start_fmt})
                             pure_lines.append(f"{start_fmt} {seg.text.strip()}")
@@ -108,8 +123,11 @@ with col_controls:
                             vtt_lines.append(f"{to_vtt_time(seg.start)} --> {to_vtt_time(seg.end)}\n{seg.text.strip()}\n")
                         
                         st.session_state.update({'pure_text': "\n".join(pure_lines), 'srt_text': "\n".join(srt_lines), 'vtt_text': "\n".join(vtt_lines)})
-                        visual_loader.empty(); st.rerun()
-                except Exception as e: st.error(f"Error: {e}")
+                        visual_loader.empty()
+                        st.rerun()
+                        
+                except Exception as e: 
+                    st.error(f"Error: {e}")
                 finally:
                     if os.path.exists(tmp_media_path): os.remove(tmp_media_path)
                     if 'tmp_audio_path' in locals() and os.path.exists(tmp_audio_path): os.remove(tmp_audio_path)
