@@ -210,7 +210,7 @@ with col_output:
                 st.markdown("### 🧠 Edge-AI Semantic Analyzer")
                 st.write("This engine runs entirely local and offline using statistical parsing to extract summary metrics, action items, and key decisions.")
                 
-                if st.button("✨ Execute Local NLP Pipeline", type="primary"):
+                if st.button("✨ Generate Insights", type="primary"):
                     with st.spinner("Processing local text matrix..."):
                         time.sleep(0.8)  # Smooth UI transition
                         
