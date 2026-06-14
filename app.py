@@ -40,12 +40,14 @@ st.markdown("""
 
     /* Style the Text Area to fill the right panel perfectly */
     .stTextArea textarea {
-        background-color: #F8FAFC;
+        background-color: #F8FAFC !important;
         border-radius: 8px;
-        border: 2px solid #E2E8F0;
+        border: 2px solid #E2E8F0 !important;
         font-family: 'Courier New', Courier, monospace;
         font-size: 14px;
         line-height: 1.6;
+        color: #0F172A !important; /* Forces dark text */
+        -webkit-text-fill-color: #0F172A !important; /* Forces dark text even when disabled */
     }
     
     /* Style Download Button */
