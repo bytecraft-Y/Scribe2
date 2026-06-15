@@ -309,26 +309,28 @@ with col_output:
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.download_button("📥 Download Analysis Brief", st.session_state.ai_summary, "Local_Analysis_Brief.md", "text/markdown")
 # ==========================================
-# JAVASCRIPT BRIDGE (Bulletproof Real-Time Polling)
+# JAVASCRIPT BRIDGE (Syntax Fixed & Optimized)
 # ==========================================
 if st.session_state.segments_data:
     js_code = r"""
     <script>
-        const parentDoc = window.parent.document;
+        // THE FIX: Correctly targeting the parent window
+        const parentWindow = window.parent;
+        const parentDoc = parentWindow.document;
         
-        // 1. Clear old master clocks to prevent overlap
-        if (parentDoc.window.scribeSyncInterval) {
-            clearInterval(parentDoc.window.scribeSyncInterval);
+        // 1. Clear old master clocks safely to prevent overlap
+        if (parentWindow.scribeSyncInterval) {
+            clearInterval(parentWindow.scribeSyncInterval);
         }
         
-        // 2. The Master Clock: Runs every 500ms continuously
-        parentDoc.window.scribeSyncInterval = setInterval(() => {
+        // 2. The Master Clock: Runs every 500ms
+        parentWindow.scribeSyncInterval = setInterval(() => {
             const media = parentDoc.querySelector('video, audio');
             const searchInput = parentDoc.getElementById('search-input');
             const transcriptBox = parentDoc.getElementById('transcript-box');
             
-            // Abort if the elements aren't loaded or if the tab is hidden
-            if (!media || !transcriptBox || !transcriptBox.offsetParent) return;
+            // Abort if elements aren't loaded or if the tab is hidden (offsetHeight === 0)
+            if (!media || !transcriptBox || transcriptBox.offsetHeight === 0) return;
             
             // --- A. CLICK-TO-SEEK ---
             if (!transcriptBox.dataset.clickAttached) {
@@ -349,27 +351,29 @@ if st.session_state.segments_data:
             if (searchInput && !searchInput.dataset.searchAttached) {
                 searchInput.addEventListener('input', (e) => {
                     const term = e.target.value.trim();
-                    const regex = term ? new RegExp('\\b' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i') : null;
+                    // Safe regex escaping
+                    const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = term ? new RegExp('\\b' + escapedTerm + '\\b', 'i') : null;
                     const segs = transcriptBox.querySelectorAll('.transcript-segment');
                     
                     segs.forEach(seg => {
                         if (!term) {
-                            seg.style.opacity = '1'; seg.style.backgroundColor = 'transparent';
+                            seg.style.opacity = '1'; 
+                            seg.style.backgroundColor = 'transparent';
                         } else if (regex.test(seg.innerText)) {
-                            seg.style.opacity = '1'; seg.style.backgroundColor = '#FEF08A';
+                            seg.style.opacity = '1'; 
+                            seg.style.backgroundColor = '#FEF08A';
                         } else {
-                            seg.style.opacity = '0.2'; seg.style.backgroundColor = 'transparent';
+                            seg.style.opacity = '0.2'; 
+                            seg.style.backgroundColor = 'transparent';
                         }
                     });
                 });
                 searchInput.dataset.searchAttached = 'true';
             }
             
-            // --- C. THE REAL-TIME TRACKER (Polling Method) ---
-            // We do NOT use event listeners here. We force-check the time every 500ms.
-            // This guarantees the tracker never breaks when tabs switch.
-            
-            // Suspend auto-scroll if the user is actively searching
+            // --- C. THE REAL-TIME TRACKER ---
+            // Suspend auto-scroll if actively searching
             if (searchInput && searchInput.value.trim().length > 0) return;
             
             const time = media.currentTime;
@@ -379,17 +383,18 @@ if st.session_state.segments_data:
                 const start = parseFloat(seg.getAttribute('data-start'));
                 const end = parseFloat(seg.getAttribute('data-end'));
                 
-                // If the video time falls within the sentence timestamp
+                // Track active state using dataset to prevent redundant styling
                 if (time >= start && time <= end) {
-                    if (seg.style.backgroundColor !== 'rgb(219, 234, 254)') { 
-                        seg.style.backgroundColor = '#DBEAFE';  // Blue highlight
-                        seg.style.color = '#1D4ED8';            // Dark blue text
+                    if (seg.dataset.active !== 'true') { 
+                        seg.dataset.active = 'true';
+                        seg.style.backgroundColor = '#DBEAFE';  
+                        seg.style.color = '#1D4ED8';            
                         seg.style.fontWeight = 'bold';
-                        seg.scrollIntoView({behavior: 'smooth', block: 'center'}); // Auto-scroll
+                        seg.scrollIntoView({behavior: 'smooth', block: 'center'}); 
                     }
                 } else {
-                    // Reset sentences that are not actively playing
-                    if (seg.style.backgroundColor !== 'transparent') {
+                    if (seg.dataset.active === 'true') {
+                        seg.dataset.active = 'false';
                         seg.style.backgroundColor = 'transparent';
                         seg.style.color = '#0F172A';
                         seg.style.fontWeight = 'normal';
@@ -397,7 +402,7 @@ if st.session_state.segments_data:
                 }
             });
             
-        }, 500); // Trigger the master clock twice a second
+        }, 500); 
     </script>
     """
     components.html(js_code, height=0)
