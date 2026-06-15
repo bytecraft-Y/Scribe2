@@ -309,29 +309,29 @@ with col_output:
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.download_button("📥 Download Analysis Brief", st.session_state.ai_summary, "Local_Analysis_Brief.md", "text/markdown")
 # ==========================================
-# JAVASCRIPT BRIDGE (Event Delegation & Visibility Tracking)
+# JAVASCRIPT BRIDGE (Bulletproof Real-Time Polling)
 # ==========================================
 if st.session_state.segments_data:
     js_code = r"""
     <script>
         const parentDoc = window.parent.document;
         
-        // 1. Clear any existing intervals from previous Streamlit reruns
+        // 1. Clear old master clocks to prevent overlap
         if (parentDoc.window.scribeSyncInterval) {
             clearInterval(parentDoc.window.scribeSyncInterval);
         }
         
+        // 2. The Master Clock: Runs every 500ms continuously
         parentDoc.window.scribeSyncInterval = setInterval(() => {
             const media = parentDoc.querySelector('video, audio');
             const searchInput = parentDoc.getElementById('search-input');
             const transcriptBox = parentDoc.getElementById('transcript-box');
             
-            // Wait until the elements actually exist in the DOM
-            if (!media || !transcriptBox) return;
+            // Abort if the elements aren't loaded or if the tab is hidden
+            if (!media || !transcriptBox || !transcriptBox.offsetParent) return;
             
-            // 2. EVENT DELEGATION: Attach click listener to the BOX, not the spans.
-            // This survives tab switching because it doesn't rely on the individual span nodes.
-            if (!transcriptBox.dataset.listenerAttached) {
+            // --- A. CLICK-TO-SEEK ---
+            if (!transcriptBox.dataset.clickAttached) {
                 transcriptBox.addEventListener('click', (e) => {
                     const seg = e.target.closest('.transcript-segment');
                     if (seg) {
@@ -342,11 +342,11 @@ if st.session_state.segments_data:
                         }
                     }
                 });
-                transcriptBox.dataset.listenerAttached = 'true';
+                transcriptBox.dataset.clickAttached = 'true';
             }
             
-            // 3. SEARCH ENGINE
-            if (searchInput && !searchInput.dataset.listenerAttached) {
+            // --- B. SEARCH ENGINE ---
+            if (searchInput && !searchInput.dataset.searchAttached) {
                 searchInput.addEventListener('input', (e) => {
                     const term = e.target.value.trim();
                     const regex = term ? new RegExp('\\b' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i') : null;
@@ -362,45 +362,42 @@ if st.session_state.segments_data:
                         }
                     });
                 });
-                searchInput.dataset.listenerAttached = 'true';
+                searchInput.dataset.searchAttached = 'true';
             }
             
-            // 4. MEDIA SYNC & VISIBILITY TRACKING
-            if (!media.dataset.listenerAttached) {
-                media.addEventListener('timeupdate', () => {
-                    if (searchInput && searchInput.value.trim().length > 0) return;
-                    
-                    // CRITICAL FIX: If offsetParent is null, the tab is hidden! 
-                    // Do not attempt to highlight or scroll invisible elements.
-                    if (!transcriptBox.offsetParent) return;
-                    
-                    const time = media.currentTime;
-                    const segs = transcriptBox.querySelectorAll('.transcript-segment');
-                    
-                    segs.forEach(seg => {
-                        const start = parseFloat(seg.getAttribute('data-start'));
-                        const end = parseFloat(seg.getAttribute('data-end'));
-                        
-                        if (time >= start && time <= end) {
-                            if (seg.style.backgroundColor !== 'rgb(219, 234, 254)') { 
-                                seg.style.backgroundColor = '#DBEAFE';
-                                seg.style.color = '#1D4ED8';
-                                seg.style.fontWeight = 'bold';
-                                // Only scroll if the element is actively visible
-                                seg.scrollIntoView({behavior: 'smooth', block: 'center'});
-                            }
-                        } else {
-                            if (seg.style.backgroundColor !== 'transparent') {
-                                seg.style.backgroundColor = 'transparent';
-                                seg.style.color = '#0F172A';
-                                seg.style.fontWeight = 'normal';
-                            }
-                        }
-                    });
-                });
-                media.dataset.listenerAttached = 'true';
-            }
-        }, 500); // Check every 500ms to ensure rapid re-binding if React shifts the DOM
+            // --- C. THE REAL-TIME TRACKER (Polling Method) ---
+            // We do NOT use event listeners here. We force-check the time every 500ms.
+            // This guarantees the tracker never breaks when tabs switch.
+            
+            // Suspend auto-scroll if the user is actively searching
+            if (searchInput && searchInput.value.trim().length > 0) return;
+            
+            const time = media.currentTime;
+            const segs = transcriptBox.querySelectorAll('.transcript-segment');
+            
+            segs.forEach(seg => {
+                const start = parseFloat(seg.getAttribute('data-start'));
+                const end = parseFloat(seg.getAttribute('data-end'));
+                
+                // If the video time falls within the sentence timestamp
+                if (time >= start && time <= end) {
+                    if (seg.style.backgroundColor !== 'rgb(219, 234, 254)') { 
+                        seg.style.backgroundColor = '#DBEAFE';  // Blue highlight
+                        seg.style.color = '#1D4ED8';            // Dark blue text
+                        seg.style.fontWeight = 'bold';
+                        seg.scrollIntoView({behavior: 'smooth', block: 'center'}); // Auto-scroll
+                    }
+                } else {
+                    // Reset sentences that are not actively playing
+                    if (seg.style.backgroundColor !== 'transparent') {
+                        seg.style.backgroundColor = 'transparent';
+                        seg.style.color = '#0F172A';
+                        seg.style.fontWeight = 'normal';
+                    }
+                }
+            });
+            
+        }, 500); // Trigger the master clock twice a second
     </script>
     """
     components.html(js_code, height=0)
