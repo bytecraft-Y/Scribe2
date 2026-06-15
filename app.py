@@ -309,70 +309,98 @@ with col_output:
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.download_button("📥 Download Analysis Brief", st.session_state.ai_summary, "Local_Analysis_Brief.md", "text/markdown")
 # ==========================================
-# JAVASCRIPT BRIDGE (Precise Regex & Auto-Scroll)
+# JAVASCRIPT BRIDGE (Event Delegation & Visibility Tracking)
 # ==========================================
 if st.session_state.segments_data:
     js_code = r"""
     <script>
-        const parentDoc=window.parent.document; 
-        let syncInterval=setInterval(()=>{ 
-            const media=parentDoc.querySelector('video, audio'); 
-            const segs=parentDoc.querySelectorAll('.transcript-segment'); 
+        const parentDoc = window.parent.document;
+        
+        // 1. Clear any existing intervals from previous Streamlit reruns
+        if (parentDoc.window.scribeSyncInterval) {
+            clearInterval(parentDoc.window.scribeSyncInterval);
+        }
+        
+        parentDoc.window.scribeSyncInterval = setInterval(() => {
+            const media = parentDoc.querySelector('video, audio');
             const searchInput = parentDoc.getElementById('search-input');
-            let activeSegmentId = null;
+            const transcriptBox = parentDoc.getElementById('transcript-box');
             
-            if(media && segs.length>0){ 
-                clearInterval(syncInterval); 
-                
-                // Click-to-Seek
-                segs.forEach(seg => {
-                    seg.addEventListener('click', () => {
-                        media.currentTime = parseFloat(seg.getAttribute('data-start'));
-                        media.play();
+            // Wait until the elements actually exist in the DOM
+            if (!media || !transcriptBox) return;
+            
+            // 2. EVENT DELEGATION: Attach click listener to the BOX, not the spans.
+            // This survives tab switching because it doesn't rely on the individual span nodes.
+            if (!transcriptBox.dataset.listenerAttached) {
+                transcriptBox.addEventListener('click', (e) => {
+                    const seg = e.target.closest('.transcript-segment');
+                    if (seg) {
+                        const start = parseFloat(seg.getAttribute('data-start'));
+                        if (!isNaN(start)) {
+                            media.currentTime = start;
+                            media.play();
+                        }
+                    }
+                });
+                transcriptBox.dataset.listenerAttached = 'true';
+            }
+            
+            // 3. SEARCH ENGINE
+            if (searchInput && !searchInput.dataset.listenerAttached) {
+                searchInput.addEventListener('input', (e) => {
+                    const term = e.target.value.trim();
+                    const regex = term ? new RegExp('\\b' + term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i') : null;
+                    const segs = transcriptBox.querySelectorAll('.transcript-segment');
+                    
+                    segs.forEach(seg => {
+                        if (!term) {
+                            seg.style.opacity = '1'; seg.style.backgroundColor = 'transparent';
+                        } else if (regex.test(seg.innerText)) {
+                            seg.style.opacity = '1'; seg.style.backgroundColor = '#FEF08A';
+                        } else {
+                            seg.style.opacity = '0.2'; seg.style.backgroundColor = 'transparent';
+                        }
                     });
                 });
-                
-                // Precise Regex Keyword Search
-                if (searchInput) {
-                    searchInput.addEventListener('input', (e) => {
-                        const term = e.target.value.trim();
-                        if (term.length === 0) {
-                            segs.forEach(seg => { seg.style.opacity = '1'; seg.style.backgroundColor = 'transparent'; });
-                            return;
-                        }
-                        const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                        const regex = new RegExp('\\b' + escapedTerm + '\\b', 'i');
-                        segs.forEach(seg => {
-                            if (regex.test(seg.innerText)) {
-                                seg.style.opacity = '1'; seg.style.backgroundColor = '#FEF08A';
-                            } else {
-                                seg.style.opacity = '0.2'; seg.style.backgroundColor = 'transparent';
-                            }
-                        });
-                    });
-                }
-                
-                // Cinematic Auto-Scroll
-                media.addEventListener('timeupdate', ()=>{ 
-                    if (searchInput && searchInput.value.trim().length > 0) return;
-                    const time=media.currentTime; 
-                    segs.forEach((seg, i)=>{ 
-                        const start=parseFloat(seg.getAttribute('data-start')); 
-                        const end=parseFloat(seg.getAttribute('data-end')); 
-                        
-                        if(time>=start && time<=end){ 
-                            seg.style.backgroundColor='#DBEAFE'; seg.style.color='#1D4ED8'; seg.style.fontWeight='bold';
-                            if (activeSegmentId !== i) {
-                                activeSegmentId = i;
-                                seg.scrollIntoView({behavior:'smooth', block:'center'});
-                            }
-                        }else{ 
-                            seg.style.backgroundColor='transparent'; seg.style.color='#0F172A'; seg.style.fontWeight='normal';
-                        } 
-                    }); 
-                }); 
+                searchInput.dataset.listenerAttached = 'true';
             }
-        }, 1000);
+            
+            // 4. MEDIA SYNC & VISIBILITY TRACKING
+            if (!media.dataset.listenerAttached) {
+                media.addEventListener('timeupdate', () => {
+                    if (searchInput && searchInput.value.trim().length > 0) return;
+                    
+                    // CRITICAL FIX: If offsetParent is null, the tab is hidden! 
+                    // Do not attempt to highlight or scroll invisible elements.
+                    if (!transcriptBox.offsetParent) return;
+                    
+                    const time = media.currentTime;
+                    const segs = transcriptBox.querySelectorAll('.transcript-segment');
+                    
+                    segs.forEach(seg => {
+                        const start = parseFloat(seg.getAttribute('data-start'));
+                        const end = parseFloat(seg.getAttribute('data-end'));
+                        
+                        if (time >= start && time <= end) {
+                            if (seg.style.backgroundColor !== 'rgb(219, 234, 254)') { 
+                                seg.style.backgroundColor = '#DBEAFE';
+                                seg.style.color = '#1D4ED8';
+                                seg.style.fontWeight = 'bold';
+                                // Only scroll if the element is actively visible
+                                seg.scrollIntoView({behavior: 'smooth', block: 'center'});
+                            }
+                        } else {
+                            if (seg.style.backgroundColor !== 'transparent') {
+                                seg.style.backgroundColor = 'transparent';
+                                seg.style.color = '#0F172A';
+                                seg.style.fontWeight = 'normal';
+                            }
+                        }
+                    });
+                });
+                media.dataset.listenerAttached = 'true';
+            }
+        }, 500); // Check every 500ms to ensure rapid re-binding if React shifts the DOM
     </script>
     """
     components.html(js_code, height=0)
