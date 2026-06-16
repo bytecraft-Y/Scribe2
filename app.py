@@ -204,111 +204,77 @@ with col_output:
                 col_srt.download_button("🎬 Subtitles (.srt)", st.session_state.srt_text, "Scribe_Transcript.srt")
                 col_vtt.download_button("🌐 Web Subtitles (.vtt)", st.session_state.vtt_text, "Scribe_Transcript.vtt")
 
-            # --- TAB 2: AI INSIGHTS (Hybrid Engine) ---
+            # --- TAB 2: AI INSIGHTS (Local Engine) ---
             with tab_ai:
                 st.markdown("### 🧠 Transcript Analysis & Insight Extraction")
-                
-                api_key_input = st.text_input(
-                    "🔑 Enter OpenAI API Key for Advanced Summarization (Optional)", 
-                    type="password",
-                    placeholder="sk-...",
-                    help="Leave blank to extract insights using the local, offline TF-IDF engine."
-                )
+                st.write("Extracting insights using a secure, offline TF-IDF and heuristic engine.")
                 
                 st.write("---")
                 
                 if st.button("✨ Extract Insights from Transcript", type="primary"):
-                    with st.spinner("Analyzing transcript text..."):
+                    with st.spinner("Analyzing transcript text locally..."):
                         raw_transcript = " ".join([s['text'] for s in st.session_state.segments_data])
                         
-                        # CHOICE A: ADVANCED GENERATIVE LLM PIPELINE
-                        if api_key_input.strip().startswith("sk-"):
-                            try:
-                                from openai import OpenAI
-                                client = OpenAI(api_key=api_key_input.strip())
-                                
-                                system_instruction = "You are an expert systems analyst. Analyze the provided meeting transcript and compile a definitive analysis brief formatted in Markdown."
-                                user_prompt = f"Analyze this transcript and extract:\n1. Top 5 contextual tags.\n2. An Executive Summary.\n3. A bulleted list of Action Items.\n4. Key Decisions & Core Insights.\n\nTranscript:\n{raw_transcript}"
-                                
-                                response = client.chat.completions.create(
-                                    model="gpt-4o-mini",
-                                    messages=[
-                                        {"role": "system", "content": system_instruction},
-                                        {"role": "user", "content": user_prompt}
-                                    ],
-                                    temperature=0.2
-                                )
-                                st.session_state.ai_summary = response.choices[0].message.content
-                                st.toast("Cloud AI Extraction Successful!", icon="🚀")
-                                
-                            except ImportError:
-                                st.error("Missing dependency: pip install openai")
-                            except Exception as llm_error:
-                                st.error(f"LLM API Error: {str(llm_error)}")
+                        sentences = [s.strip() for s in re.split(r'[.!?]', raw_transcript) if len(s.strip()) > 20]
                         
-                        # CHOICE B: LOCAL TF-IDF ENGINE (Fallback)
+                        if not sentences:
+                            st.session_state.ai_summary = "⚠️ Insufficient transcript data to analyze. Please provide a longer audio file."
                         else:
-                            st.info("ℹ️ No API key detected. Extracting insights locally using TF-IDF...")
-                            sentences = [s.strip() for s in re.split(r'[.!?]', raw_transcript) if len(s.strip()) > 20]
+                            stop_words = set(["the", "a", "an", "and", "or", "but", "if", "then", "of", "to", "in", "is", "it", "you", "that", "this", "was", "for", "on", "as", "with", "so", "we", "they", "i", "are", "be", "have"])
+                            df = Counter()
+                            sent_tokens = []
+                            for sent in sentences:
+                                tokens = [w.lower() for w in re.findall(r'\b\w+\b', sent) if w.lower() not in stop_words]
+                                sent_tokens.append(tokens)
+                                for token in set(tokens):
+                                    df[token] += 1
                             
-                            if not sentences:
-                                st.session_state.ai_summary = "⚠️ Insufficient transcript data to analyze. Please provide a longer audio file."
-                            else:
-                                stop_words = set(["the", "a", "an", "and", "or", "but", "if", "then", "of", "to", "in", "is", "it", "you", "that", "this", "was", "for", "on", "as", "with", "so", "we", "they", "i", "are", "be", "have"])
-                                df = Counter()
-                                sent_tokens = []
-                                for sent in sentences:
-                                    tokens = [w.lower() for w in re.findall(r'\b\w+\b', sent) if w.lower() not in stop_words]
-                                    sent_tokens.append(tokens)
-                                    for token in set(tokens):
-                                        df[token] += 1
-                                
-                                N = len(sentences)
-                                sent_scores = []
-                                global_tf_idf = Counter()
-                                
-                                for i, tokens in enumerate(sent_tokens):
-                                    score = 0
-                                    tf = Counter(tokens)
-                                    if len(tokens) > 0:
-                                        for token, count in tf.items():
-                                            idf = math.log(N / (1 + df[token]))
-                                            tf_idf_val = (count / len(tokens)) * idf
-                                            score += tf_idf_val
-                                            global_tf_idf[token] += tf_idf_val
-                                    sent_scores.append((score, i, sentences[i]))
-                                
-                                top_scored_sents = sorted(sent_scores, key=lambda x: x[0], reverse=True)[:3]
-                                chronological_summary = sorted(top_scored_sents, key=lambda x: x[1])
-                                top_keywords = [word for word, score in global_tf_idf.most_common(5)]
-                                
-                                action_pattern = re.compile(r'\b(need to|have to|will|should|must|task|assign|todo|action item|fix|update)\b', re.IGNORECASE)
-                                decision_pattern = re.compile(r'\b(decided|agreed|concluded|choose|settled|resolved|instead of)\b', re.IGNORECASE)
-                                
-                                extracted_actions = []
-                                extracted_decisions = []
-                                
-                                for sent in sentences:
-                                    if action_pattern.search(sent) and sent not in extracted_actions and len(extracted_actions) < 4:
-                                        extracted_actions.append(sent)
-                                    if decision_pattern.search(sent) and sent not in extracted_decisions and len(extracted_decisions) < 3:
-                                        extracted_decisions.append(sent)
-                                
-                                output = f"**🏷️ Extracted Tags (Local Analysis):** {', '.join([k.capitalize() for k in top_keywords])}\n\n---\n"
-                                output += "### 📌 Extracted Summary\n"
-                                for _, _, s in chronological_summary:
-                                    output += f"{s.capitalize()}.\n"
-                                output += "\n### ✅ Extracted Action Items\n"
-                                if extracted_actions:
-                                    for a in extracted_actions: output += f"* {a.capitalize()}.\n"
-                                else: output += "* No explicit action items detected via local heuristics.\n"
-                                output += "\n### 💡 Extracted Decisions & Insights\n"
-                                if extracted_decisions:
-                                    for d in extracted_decisions: output += f"* {d.capitalize()}.\n"
-                                else: output += "* No explicit decisions flagged via local heuristics.\n"
-                                
-                                st.session_state.ai_summary = output
-                                st.toast("Local Insight Extraction Complete!", icon="🧠")
+                            N = len(sentences)
+                            sent_scores = []
+                            global_tf_idf = Counter()
+                            
+                            for i, tokens in enumerate(sent_tokens):
+                                score = 0
+                                tf = Counter(tokens)
+                                if len(tokens) > 0:
+                                    for token, count in tf.items():
+                                        idf = math.log(N / (1 + df[token]))
+                                        tf_idf_val = (count / len(tokens)) * idf
+                                        score += tf_idf_val
+                                        global_tf_idf[token] += tf_idf_val
+                                sent_scores.append((score, i, sentences[i]))
+                            
+                            top_scored_sents = sorted(sent_scores, key=lambda x: x[0], reverse=True)[:3]
+                            chronological_summary = sorted(top_scored_sents, key=lambda x: x[1])
+                            top_keywords = [word for word, score in global_tf_idf.most_common(5)]
+                            
+                            action_pattern = re.compile(r'\b(need to|have to|will|should|must|task|assign|todo|action item|fix|update)\b', re.IGNORECASE)
+                            decision_pattern = re.compile(r'\b(decided|agreed|concluded|choose|settled|resolved|instead of)\b', re.IGNORECASE)
+                            
+                            extracted_actions = []
+                            extracted_decisions = []
+                            
+                            for sent in sentences:
+                                if action_pattern.search(sent) and sent not in extracted_actions and len(extracted_actions) < 4:
+                                    extracted_actions.append(sent)
+                                if decision_pattern.search(sent) and sent not in extracted_decisions and len(extracted_decisions) < 3:
+                                    extracted_decisions.append(sent)
+                            
+                            output = f"**🏷️ Extracted Tags (Local Analysis):** {', '.join([k.capitalize() for k in top_keywords])}\n\n---\n"
+                            output += "### 📌 Extracted Summary\n"
+                            for _, _, s in chronological_summary:
+                                output += f"{s.capitalize()}.\n"
+                            output += "\n### ✅ Extracted Action Items\n"
+                            if extracted_actions:
+                                for a in extracted_actions: output += f"* {a.capitalize()}.\n"
+                            else: output += "* No explicit action items detected via local heuristics.\n"
+                            output += "\n### 💡 Extracted Decisions & Insights\n"
+                            if extracted_decisions:
+                                for d in extracted_decisions: output += f"* {d.capitalize()}.\n"
+                            else: output += "* No explicit decisions flagged via local heuristics.\n"
+                            
+                            st.session_state.ai_summary = output
+                            st.toast("Local Insight Extraction Complete!", icon="🧠")
 
                 # Render Output Card
                 if st.session_state.ai_summary:
