@@ -18,9 +18,28 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. Custom CSS - "Chrome Stripped" UI & Enterprise Layout
+# 2. Custom CSS - "Chrome Stripped" UI & Custom Wallpaper
+# Using a high-resolution, deep-focus abstract background
 st.markdown("""
 <style>
+    /* 1. Apply the Background Wallpaper */
+    .stApp {
+        background-image: url("https://images.unsplash.com/photo-1550684848-fac1c5b4e853?q=80&w=2070&auto=format&fit=crop");
+        background-attachment: fixed;
+        background-size: cover;
+        background-position: center;
+    }
+
+    /* 2. Add a translucent glass effect to the main panels so text remains readable */
+    div[data-testid="stVerticalBlock"] > div > div {
+        background-color: rgba(255, 255, 255, 0.92); 
+        border-radius: 12px;
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+        backdrop-filter: blur(4px);
+        padding: 5px;
+    }
+
+    /* 3. Original UI Stripping & Typography */
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; max-width: 95vw !important; }
     .app-title { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 2.2rem; color: #0F172A; margin-bottom: 0px; letter-spacing: -0.5px;}
