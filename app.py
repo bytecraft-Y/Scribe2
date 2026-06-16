@@ -9,7 +9,6 @@ import random
 import re       
 import math     
 from collections import Counter
-import io
 
 # 1. Page Configuration
 st.set_page_config(
@@ -48,7 +47,7 @@ def load_model():
 model = load_model()
 
 # Header
-st.markdown("<h1 class='app-title'>Scribe AI: Transcript Extractor</h1><span class='app-subtitle'>Audio/Video-to-Text & Insight Extraction Tool</span>", unsafe_allow_html=True)
+st.markdown("<h1 class='app-title'>Scribe AI: Transcript Extractor</h1><span class='app-subtitle'>Audio-to-Text & Insight Extraction Tool</span>", unsafe_allow_html=True)
 st.markdown("---")
 
 col_controls, col_output = st.columns([1, 2], gap="large")
@@ -60,62 +59,12 @@ with col_controls:
     with st.container(height=720, border=True):
         st.markdown("### 📥 Source Media")
         
-        # Internet / Local Toggle
-        input_source = st.radio("Media Source", ["📁 Local Upload", "🌐 Internet Link"], horizontal=True, label_visibility="collapsed")
-        
         # Initialize States
         if 'segments_data' not in st.session_state: 
             st.session_state.update({'segments_data': [], 'pure_text': '', 'srt_text': '', 'vtt_text': '', 'analytics': None, 'ai_summary': None})
             
-        uploaded_file = None
-
-        # Handle File Input Logic
-        if input_source == "📁 Local Upload":
-            uploaded_file = st.file_uploader("Upload audio or video for transcription", type=["mp3", "wav", "mp4", "ts", "mov", "mkv", "avi"], label_visibility="collapsed")
-        else:
-            media_url = st.text_input("🔗 Paste Web URL for Transcription (YouTube, Podcast, etc.)", placeholder="https://...")
-            if media_url:
-                if st.button("⬇️ Fetch Media from Internet", use_container_width=True):
-                    with st.spinner("Establishing secure connection and pulling media stream..."):
-                        try:
-                            import yt_dlp
-                            ydl_opts = {
-                                'format': 'bestaudio/best',
-                                'outtmpl': 'temp_download_%(id)s.%(ext)s',
-                                'quiet': True,
-                                'no_warnings': True,
-                                'extractor_args': {'youtube': {'client': ['android', 'tv']}},
-                                'http_headers': {
-                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                                    'Accept-Language': 'en-US,en;q=0.9'
-                                }
-                            }
-                            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                                info = ydl.extract_info(media_url, download=True)
-                                downloaded_filename = ydl.prepare_filename(info)
-                            
-                            with open(downloaded_filename, "rb") as f:
-                                file_bytes = f.read()
-                            os.remove(downloaded_filename)
-                            
-                            class MockUploadedFile(io.BytesIO):
-                                def __init__(self, initial_bytes, name):
-                                    super().__init__(initial_bytes)
-                                    self.name = name
-                            
-                            st.session_state.fetched_web_file = MockUploadedFile(file_bytes, downloaded_filename)
-                            st.rerun()
-                        except ImportError:
-                            st.error("Missing dependency: pip install yt-dlp")
-                        except Exception as e:
-                            st.error(f"Failed to fetch media: {str(e)}")
-
-        # Map the fetched web file to the uploaded_file variable
-        if input_source == "🌐 Internet Link" and "fetched_web_file" in st.session_state:
-            uploaded_file = st.session_state.fetched_web_file
-            if st.button("🗑️ Clear Fetched Media", use_container_width=True):
-                del st.session_state.fetched_web_file
-                st.rerun()
+        # Clean Local File Uploader
+        uploaded_file = st.file_uploader("Upload audio or video for transcription", type=["mp3", "wav", "mp4", "ts", "mov", "mkv", "avi"], label_visibility="collapsed")
 
         # Hard Reset on File Removal
         if uploaded_file is None:
