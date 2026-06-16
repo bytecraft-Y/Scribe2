@@ -6,9 +6,9 @@ import tempfile
 import gc
 import time
 import random
-import re       # <-- NEW: For exact word matching
-import math     # <-- NEW: For TF-IDF calculations
-from collections import Counter # <-- NEW: For frequency analysis
+import re       
+import math     
+from collections import Counter 
 
 # 1. Page Configuration
 st.set_page_config(
@@ -60,16 +60,12 @@ with col_controls:
         st.markdown("### 📥 Input Media")
         uploaded_file = st.file_uploader("Upload audio or video", type=["mp3", "wav", "mp4", "ts", "mov", "mkv", "avi"], label_visibility="collapsed")
         
-        # Anti-Ghosting Placeholder
-        media_placeholder = st.empty()
-        
         # Initialize States
         if 'segments_data' not in st.session_state: 
             st.session_state.update({'segments_data': [], 'pure_text': '', 'srt_text': '', 'vtt_text': '', 'analytics': None, 'ai_summary': None})
         
         # Hard Reset on File Removal
         if uploaded_file is None:
-            media_placeholder.empty()
             st.session_state.analytics = None
             st.session_state.ai_summary = None
             st.session_state.segments_data = []
@@ -85,13 +81,15 @@ with col_controls:
             tmp_media.close()
             tmp_media_path = tmp_media.name
             
-            with media_placeholder.container():
-                st.markdown("**Media Preview:**")
-                uploaded_file.seek(0)
-                if file_extension.lower() in ['.mp3', '.wav']:
-                    st.audio(uploaded_file)
-                else:
-                    st.video(uploaded_file)
+            # --- THE PYTHON FIX: NO MORE st.empty() ---
+            # By placing this directly in the container flow, Streamlit locks the UI identity 
+            # and prevents the player from unmounting during button reruns.
+            st.markdown("**Media Preview:**")
+            uploaded_file.seek(0)
+            if file_extension.lower() in ['.mp3', '.wav']:
+                st.audio(uploaded_file)
+            else:
+                st.video(uploaded_file)
             
             # Advanced Analytics Grid
             if st.session_state.analytics:
@@ -195,7 +193,6 @@ with col_output:
             with tab_transcript:
                 st.markdown("<input type='text' id='search-input' placeholder='🔍 Search exact word...' style='width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #E2E8F0; color: #0F172A;'>", unsafe_allow_html=True)
                 
-                # Dark Slate text (#0F172A) forced to override Streamlit Dark Mode
                 html_content = "<div id='transcript-box' style='height: 400px; overflow-y: auto; padding: 15px; background: #F8FAFC; border-radius: 8px; color: #0F172A;'>"
                 for i, seg in enumerate(st.session_state.segments_data):
                     html_content += f"<span class='transcript-segment' id='seg-{i}' data-start='{seg['start']}' data-end='{seg['end']}' style='display:inline-block; padding: 2px 4px; border-radius:4px; cursor:pointer; color: #0F172A;' title='Click to seek'><strong>{seg['display_time']}</strong> {seg['text']}</span><br>"
@@ -218,26 +215,21 @@ with col_output:
                         time.sleep(0.5) 
                         
                         raw_text = " ".join([s['text'] for s in st.session_state.segments_data])
-                        # Robust sentence splitting
                         sentences = [s.strip() for s in re.split(r'[.!?]', raw_text) if len(s.strip()) > 20]
                         
                         if not sentences:
                             st.session_state.ai_summary = "⚠️ Insufficient transcript data to analyze. Please provide a longer audio file."
                         else:
-                            # 1. ADVANCED SUMMARIZATION (TF-IDF Algorithm)
+                            # 1. ADVANCED SUMMARIZATION (TF-IDF)
                             stop_words = set(["the", "a", "an", "and", "or", "but", "if", "then", "of", "to", "in", "is", "it", "you", "that", "this", "was", "for", "on", "as", "with", "so", "we", "they", "i", "are", "be", "have"])
-                            
-                            # Calculate Document Frequency (DF)
                             df = Counter()
                             sent_tokens = []
                             for sent in sentences:
-                                # Extract clean words using regex
                                 tokens = [w.lower() for w in re.findall(r'\b\w+\b', sent) if w.lower() not in stop_words]
                                 sent_tokens.append(tokens)
                                 for token in set(tokens):
                                     df[token] += 1
                             
-                            # Calculate TF-IDF Score per sentence
                             N = len(sentences)
                             sent_scores = []
                             global_tf_idf = Counter()
@@ -247,23 +239,17 @@ with col_output:
                                 tf = Counter(tokens)
                                 if len(tokens) > 0:
                                     for token, count in tf.items():
-                                        # Inverse Document Frequency math
                                         idf = math.log(N / (1 + df[token]))
                                         tf_idf_val = (count / len(tokens)) * idf
                                         score += tf_idf_val
                                         global_tf_idf[token] += tf_idf_val
-                                        
                                 sent_scores.append((score, i, sentences[i]))
                             
-                            # Extract Top 3 sentences based on score
                             top_scored_sents = sorted(sent_scores, key=lambda x: x[0], reverse=True)[:3]
-                            # Re-sort them chronologically (by their original index) so the summary reads naturally
                             chronological_summary = sorted(top_scored_sents, key=lambda x: x[1])
-                            
-                            # Extract Top 5 Keywords for auto-tagging
                             top_keywords = [word for word, score in global_tf_idf.most_common(5)]
                             
-                            # 2. PRECISION HEURISTIC PARSING (Regex)
+                            # 2. PRECISION HEURISTIC PARSING
                             action_pattern = re.compile(r'\b(need to|have to|will|should|must|task|assign|todo|action item|fix|update)\b', re.IGNORECASE)
                             decision_pattern = re.compile(r'\b(decided|agreed|concluded|choose|settled|resolved|instead of)\b', re.IGNORECASE)
                             
@@ -276,9 +262,8 @@ with col_output:
                                 if decision_pattern.search(sent) and sent not in extracted_decisions and len(extracted_decisions) < 3:
                                     extracted_decisions.append(sent)
                             
-                            # 3. COMPILE ENTERPRISE REPORT
+                            # 3. COMPILE REPORT
                             output = f"**🏷️ Auto-Generated Tags:** {', '.join([k.capitalize() for k in top_keywords])}\n\n---\n"
-                            
                             output += "### 📌 Executive Summary\n"
                             for _, _, s in chronological_summary:
                                 output += f"{s.capitalize()}.\n"
@@ -304,12 +289,11 @@ with col_output:
                     st.markdown("<div style='background: #F8FAFC; padding: 25px; border-radius: 8px; border-left: 5px solid #06B6D4; color: #0F172A; margin-top: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>", unsafe_allow_html=True)
                     st.markdown(st.session_state.ai_summary)
                     st.markdown("</div>", unsafe_allow_html=True)
-                    
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.download_button("📥 Download Analysis Brief", st.session_state.ai_summary, "Local_Analysis_Brief.md", "text/markdown")
 
 # ==========================================
-# JAVASCRIPT BRIDGE (Syntax Fixed, Optimized & Ghost Buster Added)
+# JAVASCRIPT BRIDGE (Buffer-Flush Ghost Buster Edition)
 # ==========================================
 if st.session_state.segments_data:
     js_code = r"""
@@ -317,32 +301,30 @@ if st.session_state.segments_data:
         const parentWindow = window.parent;
         const parentDoc = parentWindow.document;
         
-        // 1. Clear old master clocks safely to prevent overlap
         if (parentWindow.scribeSyncInterval) {
             clearInterval(parentWindow.scribeSyncInterval);
         }
         
-        // 2. The Master Clock: Runs every 500ms
         parentWindow.scribeSyncInterval = setInterval(() => {
             
-            // --- THE GHOST BUSTER FAILSAFE ---
-            // Destroys duplicate audio/video tags spawned during Streamlit reruns
+            // --- THE GHOST BUSTER (BUFFER FLUSH EDITION) ---
             const allMedia = parentDoc.querySelectorAll('video, audio');
             if (allMedia.length > 1) {
-                allMedia.forEach((m, index) => {
-                    if (index !== 0) { 
-                        m.pause(); 
-                        m.removeAttribute('src'); 
-                        m.remove(); 
-                    }
-                });
+                // If Streamlit duplicates the player, keep the last (newest) one, kill the rest
+                for (let i = 0; i < allMedia.length - 1; i++) {
+                    let ghost = allMedia[i];
+                    ghost.pause();
+                    ghost.removeAttribute('src'); 
+                    ghost.load(); // THE SILVER BULLET: Forces browser to instantly drop the audio buffer
+                    ghost.remove();
+                }
             }
             
-            const media = allMedia[0];
+            const media = allMedia[allMedia.length - 1]; // The surviving active player
             const searchInput = parentDoc.getElementById('search-input');
             const transcriptBox = parentDoc.getElementById('transcript-box');
             
-            // Abort if elements aren't loaded or if the tab is hidden (offsetHeight === 0)
+            // Abort if elements aren't loaded or if the tab is hidden
             if (!media || !transcriptBox || transcriptBox.offsetHeight === 0) return;
             
             // --- A. CLICK-TO-SEEK ---
@@ -364,7 +346,6 @@ if st.session_state.segments_data:
             if (searchInput && !searchInput.dataset.searchAttached) {
                 searchInput.addEventListener('input', (e) => {
                     const term = e.target.value.trim();
-                    // Safe regex escaping
                     const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                     const regex = term ? new RegExp('\\b' + escapedTerm + '\\b', 'i') : null;
                     const segs = transcriptBox.querySelectorAll('.transcript-segment');
@@ -386,7 +367,6 @@ if st.session_state.segments_data:
             }
             
             // --- C. THE REAL-TIME TRACKER ---
-            // Suspend auto-scroll if actively searching
             if (searchInput && searchInput.value.trim().length > 0) return;
             
             const time = media.currentTime;
@@ -396,7 +376,6 @@ if st.session_state.segments_data:
                 const start = parseFloat(seg.getAttribute('data-start'));
                 const end = parseFloat(seg.getAttribute('data-end'));
                 
-                // Track active state using dataset to prevent redundant styling
                 if (time >= start && time <= end) {
                     if (seg.dataset.active !== 'true') { 
                         seg.dataset.active = 'true';
