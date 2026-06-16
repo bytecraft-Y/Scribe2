@@ -1,212 +1,315 @@
 import streamlit as st
 import streamlit.components.v1 as components
+from faster_whisper import WhisperModel
 import os
 import tempfile
 import gc
 import time
-import re
-import math
-from collections import Counter
-from faster_whisper import WhisperModel
+import random
+import re       # <-- NEW: For exact word matching
+import math     # <-- NEW: For TF-IDF calculations
+from collections import Counter # <-- NEW: For frequency analysis
 
-# ==========================================
-# PAGE CONFIGURATION
-# ==========================================
-st.set_page_config(page_title="Scribe AI | Enterprise", page_icon="🎙️", layout="wide")
+# 1. Page Configuration
+st.set_page_config(
+    page_title="Scribe AI | Enterprise Workspace", 
+    page_icon="🎙️", 
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# ==========================================
-# SESSION STATE INITIALIZATION
-# ==========================================
-if "segments_data" not in st.session_state:
-    st.session_state.segments_data = []
-if "uploaded_file" not in st.session_state:
-    st.session_state.uploaded_file = None
-if "ai_summary" not in st.session_state:
-    st.session_state.ai_summary = ""
+# 2. Custom CSS - "Chrome Stripped" UI & Enterprise Layout
+st.markdown("""
+<style>
+    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
+    .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; max-width: 95vw !important; }
+    .app-title { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 2.2rem; color: #0F172A; margin-bottom: 0px; letter-spacing: -0.5px;}
+    .app-subtitle { color: #3B82F6; font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; display: block; }
+    div.stButton > button:first-child { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); color: white; font-weight: 600; width: 100%; border-radius: 8px; border: none; transition: 0.3s; }
+    div[data-testid="stTabs"] button { font-weight: 600; font-size: 1.1rem; }
+</style>
+""", unsafe_allow_html=True)
 
-# ==========================================
-# MODEL LOADING (Cached for speed)
-# ==========================================
+# Helper Functions for Subtitles
+def to_srt_time(seconds):
+    h, rem = divmod(seconds, 3600); m, s = divmod(rem, 60); ms = int((s % 1) * 1000)
+    return f"{int(h):02d}:{int(m):02d}:{int(s):02d},{ms:03d}"
+
+def to_vtt_time(seconds):
+    h, rem = divmod(seconds, 3600); m, s = divmod(rem, 60); ms = int((s % 1) * 1000)
+    return f"{int(h):02d}:{int(m):02d}:{int(s):02d}.{ms:03d}"
+
+# Load AI Model Natively
 @st.cache_resource
-def load_whisper_model():
-    # Using int8 quantization for efficient CPU inference
+def load_model():
     return WhisperModel("base", device="cpu", compute_type="int8")
 
-model = load_whisper_model()
+model = load_model()
+
+# Header
+st.markdown("<h1 class='app-title'>Scribe AI Workspace</h1><span class='app-subtitle'>Enterprise Knowledge Extraction</span>", unsafe_allow_html=True)
+st.markdown("---")
+
+col_controls, col_output = st.columns([1, 2], gap="large")
 
 # ==========================================
-# SIDEBAR: UPLOAD & PROCESSING
+# LEFT PANEL: MEDIA & ANALYTICS
 # ==========================================
-with st.sidebar:
-    st.markdown("### 📁 Media Upload")
-    uploaded_file = st.file_uploader("Upload Audio/Video", type=['mp3', 'wav', 'mp4', 'mkv'])
-    
-    if uploaded_file:
-        if st.button("▶️ Process Media", type="primary"):
-            st.session_state.uploaded_file = uploaded_file
-            st.session_state.ai_summary = "" # Reset summary on new upload
+with col_controls:
+    with st.container(height=720, border=True):
+        st.markdown("### 📥 Input Media")
+        uploaded_file = st.file_uploader("Upload audio or video", type=["mp3", "wav", "mp4", "ts", "mov", "mkv", "avi"], label_visibility="collapsed")
+        
+        # Anti-Ghosting Placeholder
+        media_placeholder = st.empty()
+        
+        # Initialize States
+        if 'segments_data' not in st.session_state: 
+            st.session_state.update({'segments_data': [], 'pure_text': '', 'srt_text': '', 'vtt_text': '', 'analytics': None, 'ai_summary': None})
+        
+        # Hard Reset on File Removal
+        if uploaded_file is None:
+            media_placeholder.empty()
+            st.session_state.analytics = None
+            st.session_state.ai_summary = None
+            st.session_state.segments_data = []
+            st.session_state.pure_text = ""
+            st.session_state.srt_text = ""
+            st.session_state.vtt_text = ""
+        else:
+            # File Processing
+            uploaded_file.seek(0)
+            file_extension = os.path.splitext(uploaded_file.name)[1]
+            tmp_media = tempfile.NamedTemporaryFile(delete=False, suffix=file_extension)
+            tmp_media.write(uploaded_file.read())
+            tmp_media.close()
+            tmp_media_path = tmp_media.name
             
-            with st.spinner("Transcribing via Edge-AI (Faster-Whisper)..."):
-                try:
-                    # Save uploaded file to temporary storage
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
-                        tmp_file.write(uploaded_file.read())
-                        tmp_path = tmp_file.name
-
-                    # Execute Faster-Whisper Inference
-                    segments, info = model.transcribe(tmp_path, beam_size=7, vad_filter=True)
-                    
-                    # Store segments in session state
-                    parsed_segments = []
-                    for segment in segments:
-                        parsed_segments.append({
-                            "start": segment.start,
-                            "end": segment.end,
-                            "text": segment.text
-                        })
-                    
-                    st.session_state.segments_data = parsed_segments
-                    
-                    # Cleanup memory and temp files
-                    os.remove(tmp_path)
-                    gc.collect()
-                    st.success("Transcription Complete!")
-                    
-                except Exception as e:
-                    st.error(f"Error during processing: {str(e)}")
-
-# ==========================================
-# MAIN INTERFACE
-# ==========================================
-st.title("🎙️ Scribe AI Workspace")
-
-# 2. WORKSPACE TABS
-if st.session_state.segments_data:
-    tab_transcript, tab_ai = st.tabs(["📝 Interactive Transcript", "🧠 AI Insights"])
-    
-    # --- TAB 1: INTERACTIVE TRANSCRIPT (Original UI Restored) ---
-    with tab_transcript:
-        # The media player is back inside its dedicated tab!
-        if st.session_state.uploaded_file is not None:
-            st.audio(st.session_state.uploaded_file)
-            
-        st.markdown("""
-            <style>
-                .transcript-segment {
-                    padding: 8px; border-radius: 5px; cursor: pointer; transition: all 0.2s ease;
-                    display: inline; line-height: 1.8; font-size: 1.1rem;
-                }
-                .transcript-segment:hover { background-color: #E2E8F0; }
-                .search-box { width: 100%; padding: 10px; margin-bottom: 20px; border-radius: 8px; border: 1px solid #CBD5E1; }
-            </style>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("<input type='text' id='search-input' class='search-box' placeholder='🔍 Search transcript using Regex boundaries...'>", unsafe_allow_html=True)
-        
-        # Build the HTML Transcript
-        html_content = "<div id='transcript-box' style='padding: 20px; background: #F8FAFC; border-radius: 10px; max-height: 500px; overflow-y: auto;'>"
-        for seg in st.session_state.segments_data:
-            start = seg['start']
-            end = seg['end']
-            text = seg['text']
-            html_content += f"<span class='transcript-segment' data-start='{start}' data-end='{end}'>{text} </span>"
-        html_content += "</div>"
-        
-        st.markdown(html_content, unsafe_allow_html=True)
-
-    # --- TAB 2: AI INSIGHTS ---
-    with tab_ai:
-        st.markdown("### 🧠 Edge-AI Semantic Analyzer (TF-IDF)")
-        # ... (Keep all your existing TF-IDF Python logic here) ...        st.write("This offline engine utilizes Term Frequency-Inverse Document Frequency and Regex heuristic parsing.")
-        
-        if st.button("✨ Execute Local NLP Pipeline", type="primary"):
-            with st.spinner("Calculating TF-IDF matrices & extracting vectors..."):
-                time.sleep(0.5) 
-                
-                raw_text = " ".join([s['text'] for s in st.session_state.segments_data])
-                sentences = [s.strip() for s in re.split(r'[.!?]', raw_text) if len(s.strip()) > 20]
-                
-                if not sentences:
-                    st.session_state.ai_summary = "⚠️ Insufficient transcript data to analyze. Please provide a longer audio file."
+            with media_placeholder.container():
+                st.markdown("**Media Preview:**")
+                uploaded_file.seek(0)
+                if file_extension.lower() in ['.mp3', '.wav']:
+                    st.audio(uploaded_file)
                 else:
-                    stop_words = set(["the", "a", "an", "and", "or", "but", "if", "then", "of", "to", "in", "is", "it", "you", "that", "this", "was", "for", "on", "as", "with", "so", "we", "they", "i", "are", "be", "have", "will"])
-                    
-                    # Calculate Document Frequency (DF)
-                    df = Counter()
-                    sent_tokens = []
-                    for sent in sentences:
-                        tokens = [w.lower() for w in re.findall(r'\b\w+\b', sent) if w.lower() not in stop_words]
-                        sent_tokens.append(tokens)
-                        for token in set(tokens):
-                            df[token] += 1
-                    
-                    # Calculate TF-IDF Score
-                    N = len(sentences)
-                    sent_scores = []
-                    global_tf_idf = Counter()
-                    
-                    for i, tokens in enumerate(sent_tokens):
-                        score = 0
-                        tf = Counter(tokens)
-                        if len(tokens) > 0:
-                            for token, count in tf.items():
-                                idf = math.log(N / (1 + df[token]))
-                                tf_idf_val = (count / len(tokens)) * idf
-                                score += tf_idf_val
-                                global_tf_idf[token] += tf_idf_val
-                        sent_scores.append((score, i, sentences[i]))
-                    
-                    # Extract & Sort Chronologically
-                    top_scored_sents = sorted(sent_scores, key=lambda x: x[0], reverse=True)[:3]
-                    chronological_summary = sorted(top_scored_sents, key=lambda x: x[1])
-                    top_keywords = [word for word, score in global_tf_idf.most_common(5)]
-                    
-                    # Regex Heuristic Parsing
-                    action_pattern = re.compile(r'\b(need to|have to|should|must|task|assign|todo|action item|fix|update)\b', re.IGNORECASE)
-                    decision_pattern = re.compile(r'\b(decided|agreed|concluded|choose|settled|resolved|instead of)\b', re.IGNORECASE)
-                    
-                    extracted_actions = []
-                    extracted_decisions = []
-                    
-                    for sent in sentences:
-                        if action_pattern.search(sent) and sent not in extracted_actions and len(extracted_actions) < 4:
-                            extracted_actions.append(sent)
-                        if decision_pattern.search(sent) and sent not in extracted_decisions and len(extracted_decisions) < 3:
-                            extracted_decisions.append(sent)
-                    
-                    # Compile Report
-                    output = f"**🏷️ Auto-Generated Tags:** {', '.join([k.capitalize() for k in top_keywords])}\n\n---\n"
-                    output += "### 📌 Executive Summary\n"
-                    for _, _, s in chronological_summary:
-                        output += f"* {s.capitalize()}.\n"
+                    st.video(uploaded_file)
+            
+            # Advanced Analytics Grid
+            if st.session_state.analytics:
+                st.markdown("#### 📊 Speaker Diagnostics")
+                c1, c2 = st.columns(2)
+                c3, c4 = st.columns(2)
+                c1.metric("Language", st.session_state.analytics['lang'])
+                c2.metric("AI Confidence", st.session_state.analytics['conf'])
+                c3.metric("Duration", st.session_state.analytics['dur'])
+                c4.metric("Pace (WPM)", st.session_state.analytics['wpm'])
+            
+            st.markdown("---")
+            
+            if st.button("🚀 Start Extraction Pipeline"):
+                # Glowing CSS Sound Wave
+                loader_html = """
+                <style>
+                    .wave-container { display: flex; justify-content: center; gap: 8px; margin-bottom: 15px;}
+                    .wave-bar { width: 8px; height: 16px; background: #3B82F6; border-radius: 8px; animation: pulse 1.2s infinite; }
+                    .wave-bar:nth-child(1) { animation-delay: -1.2s; }
+                    .wave-bar:nth-child(2) { animation-delay: -1.1s; }
+                    .wave-bar:nth-child(3) { animation-delay: -1.0s; }
+                    .wave-bar:nth-child(4) { animation-delay: -0.9s; }
+                    .wave-bar:nth-child(5) { animation-delay: -0.8s; }
+                    @keyframes pulse { 0%, 100% { transform: scaleY(1); background: #93C5FD; } 50% { transform: scaleY(2.5); background: #2563EB; box-shadow: 0 0 12px rgba(37,99,235,0.6); } }
+                </style>
+                <div class="wave-container"><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div></div>
+                """
+                
+                visual_loader = st.empty()
+                visual_loader.markdown(loader_html, unsafe_allow_html=True)
+                
+                try:
+                    with st.status("Initializing Engine...", expanded=True) as status:
+                        st.write("🧠 Running Base AI Inference...")
+                        segments, info = model.transcribe(tmp_media_path, beam_size=7, vad_filter=True)
                         
-                    output += "\n### ✅ Extracted Action Items\n"
-                    if extracted_actions:
-                        for a in extracted_actions:
-                            output += f"* {a.capitalize()}.\n"
-                    else:
-                        output += "* No explicit action items or tasks detected.\n"
+                        st.session_state.segments_data, pure_lines, srt_lines, vtt_lines = [], [], [], ["WEBVTT\n"]
+                        last_quote = time.time()
+                        total_words = 0
                         
-                    output += "\n### 💡 Key Decisions & Core Insights\n"
-                    if extracted_decisions:
-                        for d in extracted_decisions:
-                            output += f"* {d.capitalize()}.\n"
-                    else:
-                        output += "* No explicit corporate decisions flagged.\n"
+                        motivational_quotes = [
+                            "Extracting semantic data...", 
+                            "Processing acoustic signals...", 
+                            "Compiling transcription matrix...",
+                            "\"The secret of getting ahead is getting started.\" — Mark Twain",
+                            "Resolving ambiguity in real time..."
+                        ]
                         
-                    st.session_state.ai_summary = output
-
-        # Render AI Output Card
-        if st.session_state.ai_summary:
-            st.markdown("<div style='background: #F8FAFC; padding: 25px; border-radius: 8px; border-left: 5px solid #06B6D4; color: #0F172A; margin-top: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>", unsafe_allow_html=True)
-            st.markdown(st.session_state.ai_summary)
-            st.markdown("</div>", unsafe_allow_html=True)
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.download_button("📥 Download Analysis Brief", st.session_state.ai_summary, "Local_Analysis_Brief.md", "text/markdown")
+                        for i, seg in enumerate(segments, 1):
+                            if time.time() - last_quote > 4: 
+                                status.update(label=f"⏳ {random.choice(motivational_quotes)}", expanded=True)
+                                last_quote = time.time()
+                            
+                            text_val = seg.text.strip()
+                            total_words += len(text_val.split())
+                            
+                            start_fmt = f"[{int(seg.start)//60:02d}:{int(seg.start)%60:02d} -> {int(seg.end)//60:02d}:{int(seg.end)%60:02d}]"
+                            st.session_state.segments_data.append({"start": seg.start, "end": seg.end, "text": text_val, "display_time": start_fmt})
+                            pure_lines.append(f"{start_fmt} {text_val}")
+                            srt_lines.append(f"{i}\n{to_srt_time(seg.start)} --> {to_srt_time(seg.end)}\n{text_val}\n")
+                            vtt_lines.append(f"{to_vtt_time(seg.start)} --> {to_vtt_time(seg.end)}\n{text_val}\n")
+                        
+                        # Populate Analytics
+                        total_dur = info.duration
+                        duration_mins = total_dur / 60
+                        calc_wpm = int(total_words / duration_mins) if duration_mins > 0 else 0
+                        
+                        st.session_state.analytics = {
+                            "lang": info.language.upper(), 
+                            "conf": f"{info.language_probability*100:.1f}%", 
+                            "dur": f"{int(total_dur//60)}m {int(total_dur%60)}s",
+                            "wpm": f"{calc_wpm} WPM"
+                        }
+                        
+                        st.session_state.update({'pure_text': "\n".join(pure_lines), 'srt_text': "\n".join(srt_lines), 'vtt_text': "\n".join(vtt_lines)})
+                        st.session_state.ai_summary = None 
+                        
+                        visual_loader.empty()
+                        st.rerun()
+                        
+                except Exception as e: 
+                    st.error(f"Error: {e}")
+                finally:
+                    if os.path.exists(tmp_media_path): os.remove(tmp_media_path)
+                    gc.collect()
 
 
 # ==========================================
-# JAVASCRIPT BRIDGE (Final Boss Edition)
+# RIGHT PANEL: TABS & INTERACTIVITY
+# ==========================================
+with col_output:
+    with st.container(height=720, border=True):
+        if not st.session_state.segments_data:
+            st.markdown("### 📄 Workspace Output")
+            st.info("👈 Upload & Run Pipeline to begin data extraction.")
+        else:
+            tab_transcript, tab_ai = st.tabs(["📄 Raw Transcript", "✨ AI Insights (Beta)"])
+            
+            # --- TAB 1: RAW TRANSCRIPT ---
+            with tab_transcript:
+                st.markdown("<input type='text' id='search-input' placeholder='🔍 Search exact word...' style='width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #E2E8F0; color: #0F172A;'>", unsafe_allow_html=True)
+                
+                # Dark Slate text (#0F172A) forced to override Streamlit Dark Mode
+                html_content = "<div id='transcript-box' style='height: 400px; overflow-y: auto; padding: 15px; background: #F8FAFC; border-radius: 8px; color: #0F172A;'>"
+                for i, seg in enumerate(st.session_state.segments_data):
+                    html_content += f"<span class='transcript-segment' id='seg-{i}' data-start='{seg['start']}' data-end='{seg['end']}' style='display:inline-block; padding: 2px 4px; border-radius:4px; cursor:pointer; color: #0F172A;' title='Click to seek'><strong>{seg['display_time']}</strong> {seg['text']}</span><br>"
+                html_content += "</div>"
+                st.markdown(html_content, unsafe_allow_html=True)
+                
+                st.markdown("<br>**Export Options:**", unsafe_allow_html=True)
+                col_txt, col_srt, col_vtt = st.columns(3)
+                col_txt.download_button("📥 TXT", st.session_state.pure_text, "Scribe.txt")
+                col_srt.download_button("🎬 SRT", st.session_state.srt_text, "Scribe.srt")
+                col_vtt.download_button("🌐 VTT", st.session_state.vtt_text, "Scribe.vtt")
+
+            # --- TAB 2: AI INSIGHTS ---
+            with tab_ai:
+                st.markdown("### 🧠 Edge-AI Semantic Analyzer (TF-IDF)")
+                st.write("This offline engine utilizes Term Frequency-Inverse Document Frequency (TF-IDF) and Regex heuristic parsing to extract highly accurate corporate intelligence.")
+                
+                if st.button("✨ Execute Local NLP Pipeline", type="primary"):
+                    with st.spinner("Calculating TF-IDF matrices & extracting vectors..."):
+                        time.sleep(0.5) 
+                        
+                        raw_text = " ".join([s['text'] for s in st.session_state.segments_data])
+                        # Robust sentence splitting
+                        sentences = [s.strip() for s in re.split(r'[.!?]', raw_text) if len(s.strip()) > 20]
+                        
+                        if not sentences:
+                            st.session_state.ai_summary = "⚠️ Insufficient transcript data to analyze. Please provide a longer audio file."
+                        else:
+                            # 1. ADVANCED SUMMARIZATION (TF-IDF Algorithm)
+                            stop_words = set(["the", "a", "an", "and", "or", "but", "if", "then", "of", "to", "in", "is", "it", "you", "that", "this", "was", "for", "on", "as", "with", "so", "we", "they", "i", "are", "be", "have"])
+                            
+                            # Calculate Document Frequency (DF)
+                            df = Counter()
+                            sent_tokens = []
+                            for sent in sentences:
+                                # Extract clean words using regex
+                                tokens = [w.lower() for w in re.findall(r'\b\w+\b', sent) if w.lower() not in stop_words]
+                                sent_tokens.append(tokens)
+                                for token in set(tokens):
+                                    df[token] += 1
+                            
+                            # Calculate TF-IDF Score per sentence
+                            N = len(sentences)
+                            sent_scores = []
+                            global_tf_idf = Counter()
+                            
+                            for i, tokens in enumerate(sent_tokens):
+                                score = 0
+                                tf = Counter(tokens)
+                                if len(tokens) > 0:
+                                    for token, count in tf.items():
+                                        # Inverse Document Frequency math
+                                        idf = math.log(N / (1 + df[token]))
+                                        tf_idf_val = (count / len(tokens)) * idf
+                                        score += tf_idf_val
+                                        global_tf_idf[token] += tf_idf_val
+                                        
+                                sent_scores.append((score, i, sentences[i]))
+                            
+                            # Extract Top 3 sentences based on score
+                            top_scored_sents = sorted(sent_scores, key=lambda x: x[0], reverse=True)[:3]
+                            # Re-sort them chronologically (by their original index) so the summary reads naturally
+                            chronological_summary = sorted(top_scored_sents, key=lambda x: x[1])
+                            
+                            # Extract Top 5 Keywords for auto-tagging
+                            top_keywords = [word for word, score in global_tf_idf.most_common(5)]
+                            
+                            # 2. PRECISION HEURISTIC PARSING (Regex)
+                            action_pattern = re.compile(r'\b(need to|have to|will|should|must|task|assign|todo|action item|fix|update)\b', re.IGNORECASE)
+                            decision_pattern = re.compile(r'\b(decided|agreed|concluded|choose|settled|resolved|instead of)\b', re.IGNORECASE)
+                            
+                            extracted_actions = []
+                            extracted_decisions = []
+                            
+                            for sent in sentences:
+                                if action_pattern.search(sent) and sent not in extracted_actions and len(extracted_actions) < 4:
+                                    extracted_actions.append(sent)
+                                if decision_pattern.search(sent) and sent not in extracted_decisions and len(extracted_decisions) < 3:
+                                    extracted_decisions.append(sent)
+                            
+                            # 3. COMPILE ENTERPRISE REPORT
+                            output = f"**🏷️ Auto-Generated Tags:** {', '.join([k.capitalize() for k in top_keywords])}\n\n---\n"
+                            
+                            output += "### 📌 Executive Summary\n"
+                            for _, _, s in chronological_summary:
+                                output += f"{s.capitalize()}.\n"
+                                
+                            output += "\n### ✅ Extracted Action Items\n"
+                            if extracted_actions:
+                                for a in extracted_actions:
+                                    output += f"* {a.capitalize()}.\n"
+                            else:
+                                output += "* No explicit action items or tasks detected in the audio narrative.\n"
+                                
+                            output += "\n### 💡 Key Decisions & Core Insights\n"
+                            if extracted_decisions:
+                                for d in extracted_decisions:
+                                    output += f"* {d.capitalize()}.\n"
+                            else:
+                                output += "* No explicit corporate decisions or conclusions flagged.\n"
+                                
+                            st.session_state.ai_summary = output
+
+                # Render Output Card
+                if st.session_state.ai_summary:
+                    st.markdown("<div style='background: #F8FAFC; padding: 25px; border-radius: 8px; border-left: 5px solid #06B6D4; color: #0F172A; margin-top: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>", unsafe_allow_html=True)
+                    st.markdown(st.session_state.ai_summary)
+                    st.markdown("</div>", unsafe_allow_html=True)
+                    
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    st.download_button("📥 Download Analysis Brief", st.session_state.ai_summary, "Local_Analysis_Brief.md", "text/markdown")
+
+# ==========================================
+# JAVASCRIPT BRIDGE (Syntax Fixed, Optimized & Ghost Buster Added)
 # ==========================================
 if st.session_state.segments_data:
     js_code = r"""
@@ -214,18 +317,23 @@ if st.session_state.segments_data:
         const parentWindow = window.parent;
         const parentDoc = parentWindow.document;
         
+        // 1. Clear old master clocks safely to prevent overlap
         if (parentWindow.scribeSyncInterval) {
             clearInterval(parentWindow.scribeSyncInterval);
         }
         
+        // 2. The Master Clock: Runs every 500ms
         parentWindow.scribeSyncInterval = setInterval(() => {
+            
             // --- THE GHOST BUSTER FAILSAFE ---
-            // Finds all media tags and ruthlessly destroys duplicates caused by Streamlit reruns
+            // Destroys duplicate audio/video tags spawned during Streamlit reruns
             const allMedia = parentDoc.querySelectorAll('video, audio');
             if (allMedia.length > 1) {
                 allMedia.forEach((m, index) => {
                     if (index !== 0) { 
-                        m.pause(); m.removeAttribute('src'); m.remove(); 
+                        m.pause(); 
+                        m.removeAttribute('src'); 
+                        m.remove(); 
                     }
                 });
             }
@@ -234,10 +342,10 @@ if st.session_state.segments_data:
             const searchInput = parentDoc.getElementById('search-input');
             const transcriptBox = parentDoc.getElementById('transcript-box');
             
-            // Abort if the transcript tab is hidden
+            // Abort if elements aren't loaded or if the tab is hidden (offsetHeight === 0)
             if (!media || !transcriptBox || transcriptBox.offsetHeight === 0) return;
             
-            // --- CLICK-TO-SEEK ---
+            // --- A. CLICK-TO-SEEK ---
             if (!transcriptBox.dataset.clickAttached) {
                 transcriptBox.addEventListener('click', (e) => {
                     const seg = e.target.closest('.transcript-segment');
@@ -252,28 +360,33 @@ if st.session_state.segments_data:
                 transcriptBox.dataset.clickAttached = 'true';
             }
             
-            // --- SEARCH ENGINE ---
+            // --- B. SEARCH ENGINE ---
             if (searchInput && !searchInput.dataset.searchAttached) {
                 searchInput.addEventListener('input', (e) => {
                     const term = e.target.value.trim();
+                    // Safe regex escaping
                     const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                     const regex = term ? new RegExp('\\b' + escapedTerm + '\\b', 'i') : null;
                     const segs = transcriptBox.querySelectorAll('.transcript-segment');
                     
                     segs.forEach(seg => {
                         if (!term) {
-                            seg.style.opacity = '1'; seg.style.backgroundColor = 'transparent';
+                            seg.style.opacity = '1'; 
+                            seg.style.backgroundColor = 'transparent';
                         } else if (regex.test(seg.innerText)) {
-                            seg.style.opacity = '1'; seg.style.backgroundColor = '#FEF08A';
+                            seg.style.opacity = '1'; 
+                            seg.style.backgroundColor = '#FEF08A';
                         } else {
-                            seg.style.opacity = '0.2'; seg.style.backgroundColor = 'transparent';
+                            seg.style.opacity = '0.2'; 
+                            seg.style.backgroundColor = 'transparent';
                         }
                     });
                 });
                 searchInput.dataset.searchAttached = 'true';
             }
             
-            // --- REAL-TIME TRACKER ---
+            // --- C. THE REAL-TIME TRACKER ---
+            // Suspend auto-scroll if actively searching
             if (searchInput && searchInput.value.trim().length > 0) return;
             
             const time = media.currentTime;
@@ -283,6 +396,7 @@ if st.session_state.segments_data:
                 const start = parseFloat(seg.getAttribute('data-start'));
                 const end = parseFloat(seg.getAttribute('data-end'));
                 
+                // Track active state using dataset to prevent redundant styling
                 if (time >= start && time <= end) {
                     if (seg.dataset.active !== 'true') { 
                         seg.dataset.active = 'true';
