@@ -8,11 +8,12 @@ import time
 import random
 import re       
 import math     
-from collections import Counter 
+from collections import Counter
+import io
 
 # 1. Page Configuration
 st.set_page_config(
-    page_title="Scribe AI | Enterprise Workspace", 
+    page_title="Scribe AI | Transcript Extractor", 
     page_icon="🎙️", 
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -29,6 +30,7 @@ st.markdown("""
     div[data-testid="stTabs"] button { font-weight: 600; font-size: 1.1rem; }
 </style>
 """, unsafe_allow_html=True)
+
 # Helper Functions for Subtitles
 def to_srt_time(seconds):
     h, rem = divmod(seconds, 3600); m, s = divmod(rem, 60); ms = int((s % 1) * 1000)
@@ -46,7 +48,7 @@ def load_model():
 model = load_model()
 
 # Header
-st.markdown("<h1 class='app-title'>Scribe AI Workspace</h1><span class='app-subtitle'>Enterprise Knowledge Extraction</span>", unsafe_allow_html=True)
+st.markdown("<h1 class='app-title'>Scribe AI: Transcript Extractor</h1><span class='app-subtitle'>Audio-to-Text & Insight Extraction Tool</span>", unsafe_allow_html=True)
 st.markdown("---")
 
 col_controls, col_output = st.columns([1, 2], gap="large")
@@ -56,13 +58,65 @@ col_controls, col_output = st.columns([1, 2], gap="large")
 # ==========================================
 with col_controls:
     with st.container(height=720, border=True):
-        st.markdown("### 📥 Input Media")
-        uploaded_file = st.file_uploader("Upload audio or video", type=["mp3", "wav", "mp4", "ts", "mov", "mkv", "avi"], label_visibility="collapsed")
+        st.markdown("### 📥 Source Media")
+        
+        # Internet / Local Toggle
+        input_source = st.radio("Media Source", ["📁 Local Upload", "🌐 Internet Link"], horizontal=True, label_visibility="collapsed")
         
         # Initialize States
         if 'segments_data' not in st.session_state: 
             st.session_state.update({'segments_data': [], 'pure_text': '', 'srt_text': '', 'vtt_text': '', 'analytics': None, 'ai_summary': None})
-        
+            
+        uploaded_file = None
+
+        # Handle File Input Logic
+        if input_source == "📁 Local Upload":
+            uploaded_file = st.file_uploader("Upload audio or video for transcription", type=["mp3", "wav", "mp4", "ts", "mov", "mkv", "avi"], label_visibility="collapsed")
+        else:
+            media_url = st.text_input("🔗 Paste Web URL for Transcription (YouTube, Podcast, etc.)", placeholder="https://...")
+            if media_url:
+                if st.button("⬇️ Fetch Media from Internet", use_container_width=True):
+                    with st.spinner("Establishing secure connection and pulling media stream..."):
+                        try:
+                            import yt_dlp
+                            ydl_opts = {
+                                'format': 'bestaudio/best',
+                                'outtmpl': 'temp_download_%(id)s.%(ext)s',
+                                'quiet': True,
+                                'no_warnings': True,
+                                'extractor_args': {'youtube': {'client': ['android', 'tv']}},
+                                'http_headers': {
+                                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                                    'Accept-Language': 'en-US,en;q=0.9'
+                                }
+                            }
+                            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                                info = ydl.extract_info(media_url, download=True)
+                                downloaded_filename = ydl.prepare_filename(info)
+                            
+                            with open(downloaded_filename, "rb") as f:
+                                file_bytes = f.read()
+                            os.remove(downloaded_filename)
+                            
+                            class MockUploadedFile(io.BytesIO):
+                                def __init__(self, initial_bytes, name):
+                                    super().__init__(initial_bytes)
+                                    self.name = name
+                            
+                            st.session_state.fetched_web_file = MockUploadedFile(file_bytes, downloaded_filename)
+                            st.rerun()
+                        except ImportError:
+                            st.error("Missing dependency: pip install yt-dlp")
+                        except Exception as e:
+                            st.error(f"Failed to fetch media: {str(e)}")
+
+        # Map the fetched web file to the uploaded_file variable
+        if input_source == "🌐 Internet Link" and "fetched_web_file" in st.session_state:
+            uploaded_file = st.session_state.fetched_web_file
+            if st.button("🗑️ Clear Fetched Media", use_container_width=True):
+                del st.session_state.fetched_web_file
+                st.rerun()
+
         # Hard Reset on File Removal
         if uploaded_file is None:
             st.session_state.analytics = None
@@ -80,9 +134,7 @@ with col_controls:
             tmp_media.close()
             tmp_media_path = tmp_media.name
             
-            # --- THE PYTHON FIX: NO MORE st.empty() ---
-            # By placing this directly in the container flow, Streamlit locks the UI identity 
-            # and prevents the player from unmounting during button reruns.
+            # --- THE PYTHON FIX: NO st.empty() ---
             st.markdown("**Media Preview:**")
             uploaded_file.seek(0)
             if file_extension.lower() in ['.mp3', '.wav']:
@@ -92,18 +144,17 @@ with col_controls:
             
             # Advanced Analytics Grid
             if st.session_state.analytics:
-                st.markdown("#### 📊 Speaker Diagnostics")
+                st.markdown("#### 📊 Transcription Diagnostics")
                 c1, c2 = st.columns(2)
                 c3, c4 = st.columns(2)
-                c1.metric("Language", st.session_state.analytics['lang'])
+                c1.metric("Language Detected", st.session_state.analytics['lang'])
                 c2.metric("AI Confidence", st.session_state.analytics['conf'])
-                c3.metric("Duration", st.session_state.analytics['dur'])
+                c3.metric("Audio Duration", st.session_state.analytics['dur'])
                 c4.metric("Pace (WPM)", st.session_state.analytics['wpm'])
             
             st.markdown("---")
             
-            if st.button("🚀 Start Extraction Pipeline"):
-                # Glowing CSS Sound Wave
+            if st.button("🚀 Generate Transcript"):
                 loader_html = """
                 <style>
                     .wave-container { display: flex; justify-content: center; gap: 8px; margin-bottom: 15px;}
@@ -122,7 +173,7 @@ with col_controls:
                 visual_loader.markdown(loader_html, unsafe_allow_html=True)
                 
                 try:
-                    with st.status("Initializing Engine...", expanded=True) as status:
+                    with st.status("Initializing Transcription Engine...", expanded=True) as status:
                         st.write("🧠 Running Base AI Inference...")
                         segments, info = model.transcribe(tmp_media_path, beam_size=7, vad_filter=True)
                         
@@ -131,11 +182,11 @@ with col_controls:
                         total_words = 0
                         
                         motivational_quotes = [
-                            "Extracting semantic data...", 
-                            "Processing acoustic signals...", 
+                            "Extracting audio data...", 
+                            "Transcribing speech to text...", 
                             "Compiling transcription matrix...",
-                            "\"The secret of getting ahead is getting started.\" — Mark Twain",
-                            "Resolving ambiguity in real time..."
+                            "Filtering background noise...",
+                            "Resolving text ambiguity..."
                         ]
                         
                         for i, seg in enumerate(segments, 1):
@@ -171,7 +222,7 @@ with col_controls:
                         st.rerun()
                         
                 except Exception as e: 
-                    st.error(f"Error: {e}")
+                    st.error(f"Transcription Error: {e}")
                 finally:
                     if os.path.exists(tmp_media_path): os.remove(tmp_media_path)
                     gc.collect()
@@ -183,14 +234,14 @@ with col_controls:
 with col_output:
     with st.container(height=720, border=True):
         if not st.session_state.segments_data:
-            st.markdown("### 📄 Workspace Output")
-            st.info("👈 Upload & Run Pipeline to begin data extraction.")
+            st.markdown("### 📄 Extraction Output")
+            st.info("👈 Upload media and click 'Generate Transcript' to begin.")
         else:
-            tab_transcript, tab_ai = st.tabs(["📄 Raw Transcript", "✨ AI Insights (Beta)"])
+            tab_transcript, tab_ai = st.tabs(["📄 Generated Transcript", "✨ Extracted Insights"])
             
             # --- TAB 1: RAW TRANSCRIPT ---
             with tab_transcript:
-                st.markdown("<input type='text' id='search-input' placeholder='🔍 Search exact word...' style='width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #E2E8F0; color: #0F172A;'>", unsafe_allow_html=True)
+                st.markdown("<input type='text' id='search-input' placeholder='🔍 Search transcript for exact words...' style='width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #E2E8F0; color: #0F172A;'>", unsafe_allow_html=True)
                 
                 html_content = "<div id='transcript-box' style='height: 400px; overflow-y: auto; padding: 15px; background: #F8FAFC; border-radius: 8px; color: #0F172A;'>"
                 for i, seg in enumerate(st.session_state.segments_data):
@@ -198,90 +249,117 @@ with col_output:
                 html_content += "</div>"
                 st.markdown(html_content, unsafe_allow_html=True)
                 
-                st.markdown("<br>**Export Options:**", unsafe_allow_html=True)
+                st.markdown("<br>**Download Transcript Files:**", unsafe_allow_html=True)
                 col_txt, col_srt, col_vtt = st.columns(3)
-                col_txt.download_button("📥 TXT", st.session_state.pure_text, "Scribe.txt")
-                col_srt.download_button("🎬 SRT", st.session_state.srt_text, "Scribe.srt")
-                col_vtt.download_button("🌐 VTT", st.session_state.vtt_text, "Scribe.vtt")
+                col_txt.download_button("📥 Plain Text (.txt)", st.session_state.pure_text, "Scribe_Transcript.txt")
+                col_srt.download_button("🎬 Subtitles (.srt)", st.session_state.srt_text, "Scribe_Transcript.srt")
+                col_vtt.download_button("🌐 Web Subtitles (.vtt)", st.session_state.vtt_text, "Scribe_Transcript.vtt")
 
-            # --- TAB 2: AI INSIGHTS ---
+            # --- TAB 2: AI INSIGHTS (Hybrid Engine) ---
             with tab_ai:
-                st.markdown("### 🧠 Edge-AI Semantic Analyzer (TF-IDF)")
-                st.write("This offline engine utilizes Term Frequency-Inverse Document Frequency (TF-IDF) and Regex heuristic parsing to extract highly accurate corporate intelligence.")
+                st.markdown("### 🧠 Transcript Analysis & Insight Extraction")
                 
-                if st.button("✨ Execute Local NLP Pipeline", type="primary"):
-                    with st.spinner("Calculating TF-IDF matrices & extracting vectors..."):
-                        time.sleep(0.5) 
+                api_key_input = st.text_input(
+                    "🔑 Enter OpenAI API Key for Advanced Summarization (Optional)", 
+                    type="password",
+                    placeholder="sk-...",
+                    help="Leave blank to extract insights using the local, offline TF-IDF engine."
+                )
+                
+                st.write("---")
+                
+                if st.button("✨ Extract Insights from Transcript", type="primary"):
+                    with st.spinner("Analyzing transcript text..."):
+                        raw_transcript = " ".join([s['text'] for s in st.session_state.segments_data])
                         
-                        raw_text = " ".join([s['text'] for s in st.session_state.segments_data])
-                        sentences = [s.strip() for s in re.split(r'[.!?]', raw_text) if len(s.strip()) > 20]
+                        # CHOICE A: ADVANCED GENERATIVE LLM PIPELINE
+                        if api_key_input.strip().startswith("sk-"):
+                            try:
+                                from openai import OpenAI
+                                client = OpenAI(api_key=api_key_input.strip())
+                                
+                                system_instruction = "You are an expert systems analyst. Analyze the provided meeting transcript and compile a definitive analysis brief formatted in Markdown."
+                                user_prompt = f"Analyze this transcript and extract:\n1. Top 5 contextual tags.\n2. An Executive Summary.\n3. A bulleted list of Action Items.\n4. Key Decisions & Core Insights.\n\nTranscript:\n{raw_transcript}"
+                                
+                                response = client.chat.completions.create(
+                                    model="gpt-4o-mini",
+                                    messages=[
+                                        {"role": "system", "content": system_instruction},
+                                        {"role": "user", "content": user_prompt}
+                                    ],
+                                    temperature=0.2
+                                )
+                                st.session_state.ai_summary = response.choices[0].message.content
+                                st.toast("Cloud AI Extraction Successful!", icon="🚀")
+                                
+                            except ImportError:
+                                st.error("Missing dependency: pip install openai")
+                            except Exception as llm_error:
+                                st.error(f"LLM API Error: {str(llm_error)}")
                         
-                        if not sentences:
-                            st.session_state.ai_summary = "⚠️ Insufficient transcript data to analyze. Please provide a longer audio file."
+                        # CHOICE B: LOCAL TF-IDF ENGINE (Fallback)
                         else:
-                            # 1. ADVANCED SUMMARIZATION (TF-IDF)
-                            stop_words = set(["the", "a", "an", "and", "or", "but", "if", "then", "of", "to", "in", "is", "it", "you", "that", "this", "was", "for", "on", "as", "with", "so", "we", "they", "i", "are", "be", "have"])
-                            df = Counter()
-                            sent_tokens = []
-                            for sent in sentences:
-                                tokens = [w.lower() for w in re.findall(r'\b\w+\b', sent) if w.lower() not in stop_words]
-                                sent_tokens.append(tokens)
-                                for token in set(tokens):
-                                    df[token] += 1
+                            st.info("ℹ️ No API key detected. Extracting insights locally using TF-IDF...")
+                            sentences = [s.strip() for s in re.split(r'[.!?]', raw_transcript) if len(s.strip()) > 20]
                             
-                            N = len(sentences)
-                            sent_scores = []
-                            global_tf_idf = Counter()
-                            
-                            for i, tokens in enumerate(sent_tokens):
-                                score = 0
-                                tf = Counter(tokens)
-                                if len(tokens) > 0:
-                                    for token, count in tf.items():
-                                        idf = math.log(N / (1 + df[token]))
-                                        tf_idf_val = (count / len(tokens)) * idf
-                                        score += tf_idf_val
-                                        global_tf_idf[token] += tf_idf_val
-                                sent_scores.append((score, i, sentences[i]))
-                            
-                            top_scored_sents = sorted(sent_scores, key=lambda x: x[0], reverse=True)[:3]
-                            chronological_summary = sorted(top_scored_sents, key=lambda x: x[1])
-                            top_keywords = [word for word, score in global_tf_idf.most_common(5)]
-                            
-                            # 2. PRECISION HEURISTIC PARSING
-                            action_pattern = re.compile(r'\b(need to|have to|will|should|must|task|assign|todo|action item|fix|update)\b', re.IGNORECASE)
-                            decision_pattern = re.compile(r'\b(decided|agreed|concluded|choose|settled|resolved|instead of)\b', re.IGNORECASE)
-                            
-                            extracted_actions = []
-                            extracted_decisions = []
-                            
-                            for sent in sentences:
-                                if action_pattern.search(sent) and sent not in extracted_actions and len(extracted_actions) < 4:
-                                    extracted_actions.append(sent)
-                                if decision_pattern.search(sent) and sent not in extracted_decisions and len(extracted_decisions) < 3:
-                                    extracted_decisions.append(sent)
-                            
-                            # 3. COMPILE REPORT
-                            output = f"**🏷️ Auto-Generated Tags:** {', '.join([k.capitalize() for k in top_keywords])}\n\n---\n"
-                            output += "### 📌 Executive Summary\n"
-                            for _, _, s in chronological_summary:
-                                output += f"{s.capitalize()}.\n"
-                                
-                            output += "\n### ✅ Extracted Action Items\n"
-                            if extracted_actions:
-                                for a in extracted_actions:
-                                    output += f"* {a.capitalize()}.\n"
+                            if not sentences:
+                                st.session_state.ai_summary = "⚠️ Insufficient transcript data to analyze. Please provide a longer audio file."
                             else:
-                                output += "* No explicit action items or tasks detected in the audio narrative.\n"
+                                stop_words = set(["the", "a", "an", "and", "or", "but", "if", "then", "of", "to", "in", "is", "it", "you", "that", "this", "was", "for", "on", "as", "with", "so", "we", "they", "i", "are", "be", "have"])
+                                df = Counter()
+                                sent_tokens = []
+                                for sent in sentences:
+                                    tokens = [w.lower() for w in re.findall(r'\b\w+\b', sent) if w.lower() not in stop_words]
+                                    sent_tokens.append(tokens)
+                                    for token in set(tokens):
+                                        df[token] += 1
                                 
-                            output += "\n### 💡 Key Decisions & Core Insights\n"
-                            if extracted_decisions:
-                                for d in extracted_decisions:
-                                    output += f"* {d.capitalize()}.\n"
-                            else:
-                                output += "* No explicit corporate decisions or conclusions flagged.\n"
+                                N = len(sentences)
+                                sent_scores = []
+                                global_tf_idf = Counter()
                                 
-                            st.session_state.ai_summary = output
+                                for i, tokens in enumerate(sent_tokens):
+                                    score = 0
+                                    tf = Counter(tokens)
+                                    if len(tokens) > 0:
+                                        for token, count in tf.items():
+                                            idf = math.log(N / (1 + df[token]))
+                                            tf_idf_val = (count / len(tokens)) * idf
+                                            score += tf_idf_val
+                                            global_tf_idf[token] += tf_idf_val
+                                    sent_scores.append((score, i, sentences[i]))
+                                
+                                top_scored_sents = sorted(sent_scores, key=lambda x: x[0], reverse=True)[:3]
+                                chronological_summary = sorted(top_scored_sents, key=lambda x: x[1])
+                                top_keywords = [word for word, score in global_tf_idf.most_common(5)]
+                                
+                                action_pattern = re.compile(r'\b(need to|have to|will|should|must|task|assign|todo|action item|fix|update)\b', re.IGNORECASE)
+                                decision_pattern = re.compile(r'\b(decided|agreed|concluded|choose|settled|resolved|instead of)\b', re.IGNORECASE)
+                                
+                                extracted_actions = []
+                                extracted_decisions = []
+                                
+                                for sent in sentences:
+                                    if action_pattern.search(sent) and sent not in extracted_actions and len(extracted_actions) < 4:
+                                        extracted_actions.append(sent)
+                                    if decision_pattern.search(sent) and sent not in extracted_decisions and len(extracted_decisions) < 3:
+                                        extracted_decisions.append(sent)
+                                
+                                output = f"**🏷️ Extracted Tags (Local Analysis):** {', '.join([k.capitalize() for k in top_keywords])}\n\n---\n"
+                                output += "### 📌 Extracted Summary\n"
+                                for _, _, s in chronological_summary:
+                                    output += f"{s.capitalize()}.\n"
+                                output += "\n### ✅ Extracted Action Items\n"
+                                if extracted_actions:
+                                    for a in extracted_actions: output += f"* {a.capitalize()}.\n"
+                                else: output += "* No explicit action items detected via local heuristics.\n"
+                                output += "\n### 💡 Extracted Decisions & Insights\n"
+                                if extracted_decisions:
+                                    for d in extracted_decisions: output += f"* {d.capitalize()}.\n"
+                                else: output += "* No explicit decisions flagged via local heuristics.\n"
+                                
+                                st.session_state.ai_summary = output
+                                st.toast("Local Insight Extraction Complete!", icon="🧠")
 
                 # Render Output Card
                 if st.session_state.ai_summary:
@@ -289,7 +367,8 @@ with col_output:
                     st.markdown(st.session_state.ai_summary)
                     st.markdown("</div>", unsafe_allow_html=True)
                     st.markdown("<br>", unsafe_allow_html=True)
-                    st.download_button("📥 Download Analysis Brief", st.session_state.ai_summary, "Local_Analysis_Brief.md", "text/markdown")
+                    st.download_button("📥 Download Extracted Insights", st.session_state.ai_summary, "Extracted_Insights.md", "text/markdown")
+
 
 # ==========================================
 # JAVASCRIPT BRIDGE (Buffer-Flush Ghost Buster Edition)
@@ -314,7 +393,7 @@ if st.session_state.segments_data:
                     let ghost = allMedia[i];
                     ghost.pause();
                     ghost.removeAttribute('src'); 
-                    ghost.load(); // THE SILVER BULLET: Forces browser to instantly drop the audio buffer
+                    ghost.load(); // Forces browser to instantly drop the audio buffer
                     ghost.remove();
                 }
             }
