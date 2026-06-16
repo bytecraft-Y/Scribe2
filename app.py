@@ -80,17 +80,16 @@ with st.sidebar:
 # ==========================================
 st.title("🎙️ Scribe AI Workspace")
 
-# 1. GLOBAL MEDIA PLAYER (The Fix for "Double Audio")
-# Rendering this ABOVE the tabs prevents Streamlit from cloning it during reruns
-if st.session_state.uploaded_file is not None:
-    st.audio(st.session_state.uploaded_file)
-
 # 2. WORKSPACE TABS
 if st.session_state.segments_data:
     tab_transcript, tab_ai = st.tabs(["📝 Interactive Transcript", "🧠 AI Insights"])
     
-    # --- TAB 1: INTERACTIVE TRANSCRIPT ---
+    # --- TAB 1: INTERACTIVE TRANSCRIPT (Original UI Restored) ---
     with tab_transcript:
+        # The media player is back inside its dedicated tab!
+        if st.session_state.uploaded_file is not None:
+            st.audio(st.session_state.uploaded_file)
+            
         st.markdown("""
             <style>
                 .transcript-segment {
@@ -115,10 +114,10 @@ if st.session_state.segments_data:
         
         st.markdown(html_content, unsafe_allow_html=True)
 
-    # --- TAB 2: AI INSIGHTS (TF-IDF & Regex) ---
+    # --- TAB 2: AI INSIGHTS ---
     with tab_ai:
         st.markdown("### 🧠 Edge-AI Semantic Analyzer (TF-IDF)")
-        st.write("This offline engine utilizes Term Frequency-Inverse Document Frequency and Regex heuristic parsing.")
+        # ... (Keep all your existing TF-IDF Python logic here) ...        st.write("This offline engine utilizes Term Frequency-Inverse Document Frequency and Regex heuristic parsing.")
         
         if st.button("✨ Execute Local NLP Pipeline", type="primary"):
             with st.spinner("Calculating TF-IDF matrices & extracting vectors..."):
