@@ -18,46 +18,15 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2# 2. Custom CSS - Clean Enterprise SaaS Layout
+# 2. Custom CSS - "Chrome Stripped" UI & Enterprise Layout
 st.markdown("""
 <style>
-    /* 1. Clean Slate Background */
-    .stApp {
-        background-color: #F1F5F9; /* Soft, cool slate grey */
-    }
-
-    /* 2. Crisp, Floating White Containers */
-    div[data-testid="stVerticalBlock"] > div > div {
-        background-color: #FFFFFF;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-        border: 1px solid #E2E8F0;
-        padding: 5px;
-    }
-
-    /* 3. Original UI Stripping & Typography */
     #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
-    .block-container { padding-top: 1.5rem !important; padding-bottom: 0rem !important; max-width: 95vw !important; }
+    .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; max-width: 95vw !important; }
     .app-title { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 2.2rem; color: #0F172A; margin-bottom: 0px; letter-spacing: -0.5px;}
     .app-subtitle { color: #3B82F6; font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; display: block; }
-    
-    /* Premium Interactive Buttons */
-    div.stButton > button:first-child { 
-        background: #0F172A; /* Deep slate instead of bright blue */
-        color: white; 
-        font-weight: 600; 
-        width: 100%; 
-        border-radius: 8px; 
-        border: none; 
-        transition: all 0.2s ease; 
-    }
-    div.stButton > button:first-child:hover {
-        background: #3B82F6; /* Illuminates blue on hover */
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-    }
-    div[data-testid="stTabs"] button { font-weight: 600; font-size: 1.1rem; color: #64748B; }
-    div[data-testid="stTabs"] button[aria-selected="true"] { color: #0F172A; }
+    div.stButton > button:first-child { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); color: white; font-weight: 600; width: 100%; border-radius: 8px; border: none; transition: 0.3s; }
+    div[data-testid="stTabs"] button { font-weight: 600; font-size: 1.1rem; }
 </style>
 """, unsafe_allow_html=True)
 # Helper Functions for Subtitles
