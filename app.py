@@ -57,7 +57,7 @@ def load_summarizer_model():
 model = load_whisper_model()
 
 # Header
-st.markdown("<h1 class='app-title'>Scribe AI: Transcript Extractor</h1><span class='app-subtitle'>Audio-to-Text & Insight Extraction Tool</span>", unsafe_allow_html=True)
+st.markdown("<h1 class='app-title'>Scribe AI: Transcript Extractor</h1><span class='app-subtitle'>Audio/Video-to-Text & Insight Extraction Tool</span>", unsafe_allow_html=True)
 st.markdown("---")
 
 col_controls, col_output = st.columns([1, 2], gap="large")
