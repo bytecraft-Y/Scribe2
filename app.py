@@ -42,7 +42,7 @@ def to_vtt_time(seconds):
 # Load AI Model Natively
 @st.cache_resource
 def load_model():
-    return WhisperModel("small.en", device="cpu", compute_type="int8")
+    return WhisperModel("base", device="cpu", compute_type="int8")
 
 model = load_model()
 
