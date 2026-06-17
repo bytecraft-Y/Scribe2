@@ -27,13 +27,9 @@ st.markdown("""
     /* 1. ADDING THE DARK BACKGROUND */
     .stApp {
         /* OPTION A: If you want to use a specific image link from Freepik */
-        /* background-image: url("https://your-image-link-here.jpg"); */
+        /* background-image: url("data:image/avif;base64,AAAAHGZ0eXBhdmlmAAAAAG1pZjFhdmlmbWlhZgAAANZtZXRhAAAAAAAAACFoZGxyAAAAAAAAAABwaWN0AAAAAAAAAAAAAAAAAAAAAA5waXRtAAAAAAABAAAAImlsb2MAAAAAREAAAQABAAAAAAD6AAEAAAAAAAABXAAAACNpaW5mAAAAAAABAAAAFWluZmUCAAAAAAEAAGF2MDEAAAAAVmlwcnAAAAA4aXBjbwAAAAxhdjFDgQQMAAAAABRpc3BlAAAAAAAAAuQAAAHuAAAAEHBpeGkAAAAAAwgICAAAABZpcG1hAAAAAAAAAAEAAQOBAgMAAAFkbWRhdBIACgoZJi4/bwQENBoQMssCRGAAUUUUQPS++8XWN++IAwOpd8kxsmoef55qpVZKHKXTZdUgT8Kw0vtDwY7NgUTW2eBtKViyc6wxSWjmtvjzvob/GjQfJOqFMUyMR06Y0QnUlFpa3GPccXPeQ5aH8YED/aXrm8aMyPzcSFmkXkeeV7OVxEohOVqVbSeAaWq1q7eYOENWm1ZUWkR8cYqehVZdr7RzEMNueD85K0qL5FwIND1golZ11mN/rTX5OW9U/5Nt5/6L/qDhh3plGCDNb5jyM6zEOIrJyuP1ZH2goH3D7fyL8bBDgRTwgzuM76C1io+ydAIvOS502LcEJUqSZIDY5LaXXEnaBXVAmODxtAJgF9+Y+3XR3WMfWSk/O1OFrBqyVod1qbgxu3Vdou2UHTU89cLIao7W/cTBhr9uPt9HCWiO6/gA8/sm7eenmTSKq01FHmUPD6kpfnswgA=="); */
         
-        /* OPTION B: Native Cinematic Dark Slate Gradient (No image file needed) */
-        background: radial-gradient(circle at top left, #1E293B, #020617);
-        background-size: cover;
-        background-attachment: fixed;
-    }
+           }
 
     /* 2. INVERTING TEXT COLORS FOR DARK MODE */
     .app-title { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 2.2rem; color: #F8FAFC; margin-bottom: 0px; letter-spacing: -0.5px;}
