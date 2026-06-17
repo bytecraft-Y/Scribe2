@@ -214,10 +214,7 @@ with col_output:
                 col_vtt.download_button("🌐 Web Subtitles (.vtt)", st.session_state.vtt_text, "Scribe_Transcript.vtt")
 # --- TAB 2: HYBRID OFFLINE ENGINE (BART + HEURISTICS) ---
             with tab_ai:
-                st.markdown("### 🧬 Hybrid AI Extraction Engine")
-                st.write("Using a **BART neural network** for abstractive summarization, combined with a **Mathematical NLP engine** for task and decision extraction.")
-                
-                st.write("---")
+               
                 
                 if st.button("✨ Extract Insights from Transcript", type="primary"):
                     with st.spinner("Initializing AI pipeline & analyzing text... (This may take a moment on the first run)"):
