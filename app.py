@@ -459,7 +459,7 @@ if st.session_state.segments_data:
                 pill.style.transition = 'top 0.3s ease, left 0.3s ease, width 0.3s ease, height 0.3s ease, opacity 0.3s ease';
                 pill.style.backgroundColor = 'rgba(56, 189, 248, 0.15)'; // Soft neon background
                 pill.style.borderLeft = '4px solid #38BDF8'; // Sharp leading edge
-                pill.style.borderRadius = '4px';
+                pill.style.borderRadius = '9px';
                 pill.style.pointerEvents = 'none'; // Prevents the pill from blocking your mouse clicks
                 pill.style.opacity = '0';
                 pill.style.zIndex = '0';
