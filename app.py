@@ -124,7 +124,7 @@ with col_controls:
                 try:
                     with st.status("Initializing Transcription Engine...", expanded=True) as status:
                         st.write("🧠 Running Base AI Inference...")
-                        segments, info = model.transcribe(tmp_media_path, beam_size=7, vad_filter=True)
+                        segments, info = model.transcribe(tmp_media_path, beam_size=5, vad_filter=True)
                         
                         st.session_state.segments_data, pure_lines, srt_lines, vtt_lines = [], [], [], ["WEBVTT\n"]
                         last_quote = time.time()
