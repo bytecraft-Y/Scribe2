@@ -46,8 +46,8 @@ def load_whisper_model():
 @st.cache_resource
 def load_summarizer_model():
     from transformers import pipeline
-    # device=-1 forces the model to run safely on the CPU
-    return pipeline("summarization", model="facebook/bart-large-cnn", device=-1)
+    # UPDATED: 'text2text-generation' replaces 'summarization' for v5 compatibility
+    return pipeline("text2text-generation", model="facebook/bart-large-cnn", device=-1)
 
 model = load_whisper_model()
 
@@ -241,7 +241,10 @@ with col_output:
                                     
                                     if chunk_len > 10:
                                         res = summarizer(chunk, max_length=max_len, min_length=min_len, do_sample=False)
-                                        summaries.append(f"* {res[0]['summary_text']}")
+                                        
+                                        # UPDATED: Safely handle output keys for both older and newer versions of Transformers
+                                        summary_output = res[0].get('summary_text', res[0].get('generated_text', ''))
+                                        summaries.append(f"* {summary_output}")
                                 
                                 # 4. Compile the Final Output
                                 compiled_summary = "\n".join(summaries)
