@@ -42,12 +42,16 @@ def to_vtt_time(seconds):
 def load_whisper_model():
     return WhisperModel("base", device="cpu", compute_type="int8")
 
-# Load Hugging Face Summarization Model Natively
+# Load Hugging Face Summarization Model (Bulletproof Direct Method)
 @st.cache_resource
 def load_summarizer_model():
-    from transformers import pipeline
-    # UPDATED: 'text2text-generation' replaces 'summarization' for v5 compatibility
-    return pipeline("text2text-generation", model="facebook/bart-large-cnn", device=-1)
+    from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+    
+    # Load the tokenizer and model directly, bypassing the pipeline registry
+    tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large-cnn")
+    model = AutoModelForSeq2SeqLM.from_pretrained("facebook/bart-large-cnn")
+    
+    return tokenizer, model
 
 model = load_whisper_model()
 
@@ -216,10 +220,10 @@ with col_output:
                 st.write("---")
                 
                 if st.button("✨ Extract Insights from Transcript", type="primary"):
-                    with st.spinner("Initializing Hugging Face pipeline & analyzing text... (This may take a moment on the first run)"):
+                    with st.spinner("Initializing Hugging Face model & analyzing text... (This may take a moment on the first run)"):
                         try:
-                            # 1. Load the model from cache
-                            summarizer = load_summarizer_model()
+                            # 1. Load the model and tokenizer from cache
+                            tokenizer, summarizer_model = load_summarizer_model()
                             
                             # 2. Prepare the raw text
                             raw_transcript = " ".join([s['text'] for s in st.session_state.segments_data])
@@ -228,23 +232,25 @@ with col_output:
                             if len(words) < 20:
                                 st.session_state.ai_summary = "⚠️ The transcript is too short to generate a meaningful summary. Please provide longer audio."
                             else:
-                                # 3. Smart Chunking (BART has a token limit, so we chunk large files by ~400 words)
+                                # 3. Smart Chunking (BART has a token limit, so we chunk large files)
                                 chunk_size = 400
                                 text_chunks = [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
                                 
                                 summaries = []
-                                for idx, chunk in enumerate(text_chunks):
-                                    # Dynamically calculate max length for short chunks
-                                    chunk_len = len(chunk.split())
-                                    max_len = min(150, int(chunk_len * 0.8))
-                                    min_len = min(30, int(chunk_len * 0.2))
-                                    
-                                    if chunk_len > 10:
-                                        res = summarizer(chunk, max_length=max_len, min_length=min_len, do_sample=False)
-                                        
-                                        # UPDATED: Safely handle output keys for both older and newer versions of Transformers
-                                        summary_output = res[0].get('summary_text', res[0].get('generated_text', ''))
-                                        summaries.append(f"* {summary_output}")
+                                for chunk in text_chunks:
+                                    if len(chunk.split()) > 10:
+                                        # Explicitly tokenize and generate the summary
+                                        inputs = tokenizer(chunk, max_length=1024, return_tensors="pt", truncation=True)
+                                        summary_ids = summarizer_model.generate(
+                                            inputs["input_ids"], 
+                                            num_beams=4, 
+                                            max_length=150, 
+                                            min_length=30, 
+                                            early_stopping=True
+                                        )
+                                        # Decode the output back into human-readable text
+                                        summary_text = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+                                        summaries.append(f"* {summary_text}")
                                 
                                 # 4. Compile the Final Output
                                 compiled_summary = "\n".join(summaries)
@@ -257,7 +263,7 @@ with col_output:
                                 st.toast("Transformer Summarization Complete!", icon="🚀")
                                 
                         except Exception as hf_error:
-                            st.error(f"Error executing Transformer pipeline: {str(hf_error)}")
+                            st.error(f"Error executing Transformer model: {str(hf_error)}")
 
                 # Render Output Card
                 if st.session_state.ai_summary:
