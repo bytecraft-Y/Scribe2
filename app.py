@@ -17,17 +17,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. Custom CSS - "Chrome Stripped" UI & Enterprise Layout
-st.markdown("""
-<style>
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
-    .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; max-width: 95vw !important; }
-    .app-title { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 2.2rem; color: #0F172A; margin-bottom: 0px; letter-spacing: -0.5px;}
-    .app-subtitle { color: #3B82F6; font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; display: block; }
-    div.stButton > button:first-child { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); color: white; font-weight: 600; width: 100%; border-radius: 8px; border: none; transition: 0.3s; }
-    div[data-testid="stTabs"] button { font-weight: 600; font-size: 1.1rem; }
-</style>
-""", unsafe_allow_html=True)
+https://www.freepik.com/free-photos-vectors/simple-dark-background/8
 
 # Helper Functions for Subtitles
 def to_srt_time(seconds):
