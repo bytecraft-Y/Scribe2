@@ -444,66 +444,43 @@ if st.session_state.segments_data:
                 searchInput.dataset.searchAttached = 'true';
             }
             
-            // --- C. THE SLIDING PILL TRACKER ---
+          // --- C. THE SLIDING PILL TRACKER (Optimized to stop Jitter) ---
             if (searchInput && searchInput.value.trim().length > 0) return;
-            
-            // 1. Inject the sliding pill into the DOM if it doesn't exist
-            let pill = parentDoc.getElementById('sliding-tracker-pill');
-            if (!pill) {
-                transcriptBox.style.position = 'relative'; // Anchors the pill to the box
-                pill = parentDoc.createElement('div');
-                pill.id = 'sliding-tracker-pill';
-                pill.style.position = 'absolute';
-                
-                // The magic CSS that makes it slide smoothly
-                pill.style.transition = 'top 0.3s ease, left 0.3s ease, width 0.3s ease, height 0.3s ease, opacity 0.3s ease';
-                pill.style.backgroundColor = 'rgba(56, 189, 248, 0.15)'; // Soft neon background
-                pill.style.borderLeft = '4px solid #38BDF8'; // Sharp leading edge
-                pill.style.borderRadius = '9px';
-                pill.style.pointerEvents = 'none'; // Prevents the pill from blocking your mouse clicks
-                pill.style.opacity = '0';
-                pill.style.zIndex = '0';
-                transcriptBox.appendChild(pill);
-            }
             
             const time = media.currentTime;
             const segs = transcriptBox.querySelectorAll('.transcript-segment');
-            let isAudioActive = false;
             
             segs.forEach(seg => {
                 const start = parseFloat(seg.getAttribute('data-start'));
                 const end = parseFloat(seg.getAttribute('data-end'));
                 
-                // Ensure text stays above the sliding pill
-                seg.style.position = 'relative';
-                seg.style.zIndex = '1';
-                
                 if (time >= start && time <= end) {
-                    isAudioActive = true;
                     if (seg.dataset.active !== 'true') { 
                         seg.dataset.active = 'true';
                         
-                        // Tell the pill to slide to this exact word's coordinates
-                        pill.style.opacity = '1';
-                        pill.style.top = (seg.offsetTop - 2) + 'px';
-                        pill.style.left = (seg.offsetLeft - 4) + 'px';
-                        pill.style.width = (seg.offsetWidth + 30) + 'px';
-                        pill.style.height = (seg.offsetHeight + 4) + 'px';
+                        // Move the sliding pill
+                        pill.style.top = seg.offsetTop + 'px';
+                        pill.style.left = seg.offsetLeft + 'px';
+                        pill.style.width = seg.offsetWidth + 'px';
+                        pill.style.height = seg.offsetHeight + 'px';
+                        pill.style.opacity = '0.3';
                         
-                        // Highlight the text itself so it pops against the pill
-                        seg.style.setProperty('color', '#38BDF8', 'important');            
-                        seg.style.setProperty('font-weight', 'bold', 'important');
+                        // FIX 1: Change color, NOT font weight (prevents text reflow/jump)
+                        seg.style.color = '#38BDF8'; 
                         
-                        seg.scrollIntoView({behavior: 'smooth', block: 'center'}); 
+                        // FIX 2: Only scroll if the element is actually out of view
+                        const rect = seg.getBoundingClientRect();
+                        const containerRect = transcriptBox.getBoundingClientRect();
+                        if (rect.top < containerRect.top || rect.bottom > containerRect.bottom) {
+                            seg.scrollIntoView({behavior: 'smooth', block: 'center'}); 
+                        }
                     }
                 } else {
                     if (seg.dataset.active === 'true') {
                         seg.dataset.active = 'false';
                         
-                        // Return text to normal. (We don't hide the pill here, we let it slide!)
-                        seg.style.setProperty('background-color', 'transparent', 'important');
-                        seg.style.setProperty('color', '#CBD5E1', 'important');
-                        seg.style.setProperty('font-weight', 'normal', 'important');
+                        // Return to normal color
+                        seg.style.color = '#CBD5E1';
                     }
                 }
             });
