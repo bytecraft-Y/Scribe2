@@ -487,7 +487,7 @@ if st.session_state.segments_data:
                         pill.style.opacity = '1';
                         pill.style.top = (seg.offsetTop - 2) + 'px';
                         pill.style.left = (seg.offsetLeft - 4) + 'px';
-                        pill.style.width = (seg.offsetWidth + 10) + 'px';
+                        pill.style.width = (seg.offsetWidth + 20) + 'px';
                         pill.style.height = (seg.offsetHeight + 4) + 'px';
                         
                         // Highlight the text itself so it pops against the pill
