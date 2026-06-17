@@ -17,7 +17,56 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-https://www.freepik.com/free-photos-vectors/simple-dark-background/8
+# 2. Custom CSS - Cinematic Dark Theme & Glassmorphism
+st.markdown("""
+<style>
+    /* HIDE DEFAULT STREAMLIT ELEMENTS */
+    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
+    .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; max-width: 95vw !important; }
+    
+    /* 1. ADDING THE DARK BACKGROUND */
+    .stApp {
+        /* OPTION A: If you want to use a specific image link from Freepik */
+        /* background-image: url("https://your-image-link-here.jpg"); */
+        
+        /* OPTION B: Native Cinematic Dark Slate Gradient (No image file needed) */
+        background: radial-gradient(circle at top left, #1E293B, #020617);
+        background-size: cover;
+        background-attachment: fixed;
+    }
+
+    /* 2. INVERTING TEXT COLORS FOR DARK MODE */
+    .app-title { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 2.2rem; color: #F8FAFC; margin-bottom: 0px; letter-spacing: -0.5px;}
+    .app-subtitle { color: #38BDF8; font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; display: block; }
+    p, span, li, h1, h2, h3, h4, h5, h6, label { color: #F1F5F9 !important; }
+    
+    /* 3. FROSTED GLASS PANELS (Glassmorphism) */
+    /* This makes the white boxes semi-transparent dark boxes to let the background blur through */
+    div[data-testid="stVerticalBlock"] > div[style*="border"] {
+        background: rgba(15, 23, 42, 0.6) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-radius: 12px;
+    }
+
+    /* 4. TRANSCRIPT BOX & BUTTON STYLING */
+    #transcript-box { background: rgba(0, 0, 0, 0.3) !important; color: #F8FAFC !important; border: 1px solid rgba(255, 255, 255, 0.05); }
+    .transcript-segment { color: #CBD5E1 !important; }
+    
+    /* 5. SEARCH BAR FIX FOR DARK MODE */
+    #search-input { 
+        background: rgba(15, 23, 42, 0.8) !important; 
+        color: #F8FAFC !important; 
+        border: 1px solid rgba(255, 255, 255, 0.2) !important; 
+    }
+    #search-input::placeholder { color: #64748B !important; }
+
+    div.stButton > button:first-child { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); color: white; font-weight: 600; width: 100%; border-radius: 8px; border: none; transition: 0.3s; }
+    div[data-testid="stTabs"] button { font-weight: 600; font-size: 1.1rem; color: #94A3B8; }
+    div[data-testid="stTabs"] button[aria-selected="true"] { color: #38BDF8 !important; }
+</style>
+""", unsafe_allow_html=True)
 
 # Helper Functions for Subtitles
 def to_srt_time(seconds):
