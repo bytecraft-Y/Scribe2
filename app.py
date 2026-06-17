@@ -373,7 +373,7 @@ with col_output:
                     st.download_button("📥 Download Extracted Insights", st.session_state.ai_summary, "Enterprise_Insights_Report.md", "text/markdown")
 
 # ==========================================
-# JAVASCRIPT BRIDGE (Buffer-Flush Ghost Buster & Real-Time Tracker)
+# JAVASCRIPT BRIDGE (Sliding Pill Animation)
 # ==========================================
 if st.session_state.segments_data:
     js_code = r"""
@@ -387,15 +387,13 @@ if st.session_state.segments_data:
         
         parentWindow.scribeSyncInterval = setInterval(() => {
             
-            // --- THE GHOST BUSTER (BUFFER FLUSH EDITION) ---
+            // --- THE GHOST BUSTER ---
             const allMedia = parentDoc.querySelectorAll('video, audio');
             if (allMedia.length > 1) {
                 for (let i = 0; i < allMedia.length - 1; i++) {
                     let ghost = allMedia[i];
-                    ghost.pause();
-                    ghost.removeAttribute('src'); 
-                    ghost.load(); 
-                    ghost.remove();
+                    ghost.pause(); ghost.removeAttribute('src'); 
+                    ghost.load(); ghost.remove();
                 }
             }
             
@@ -420,7 +418,7 @@ if st.session_state.segments_data:
                 transcriptBox.dataset.clickAttached = 'true';
             }
             
-            // --- B. SEARCH ENGINE (Dark Mode Fix) ---
+            // --- B. SEARCH ENGINE ---
             if (searchInput && !searchInput.dataset.searchAttached) {
                 searchInput.addEventListener('input', (e) => {
                     const term = e.target.value.trim();
@@ -446,23 +444,54 @@ if st.session_state.segments_data:
                 searchInput.dataset.searchAttached = 'true';
             }
             
-            // --- C. THE REAL-TIME TRACKER (High Contrast Fix) ---
+            // --- C. THE SLIDING PILL TRACKER ---
             if (searchInput && searchInput.value.trim().length > 0) return;
+            
+            // 1. Inject the sliding pill into the DOM if it doesn't exist
+            let pill = parentDoc.getElementById('sliding-tracker-pill');
+            if (!pill) {
+                transcriptBox.style.position = 'relative'; // Anchors the pill to the box
+                pill = parentDoc.createElement('div');
+                pill.id = 'sliding-tracker-pill';
+                pill.style.position = 'absolute';
+                
+                // The magic CSS that makes it slide smoothly
+                pill.style.transition = 'top 0.3s ease, left 0.3s ease, width 0.3s ease, height 0.3s ease, opacity 0.3s ease';
+                pill.style.backgroundColor = 'rgba(56, 189, 248, 0.15)'; // Soft neon background
+                pill.style.borderLeft = '3px solid #38BDF8'; // Sharp leading edge
+                pill.style.borderRadius = '4px';
+                pill.style.pointerEvents = 'none'; // Prevents the pill from blocking your mouse clicks
+                pill.style.opacity = '0';
+                pill.style.zIndex = '0';
+                transcriptBox.appendChild(pill);
+            }
             
             const time = media.currentTime;
             const segs = transcriptBox.querySelectorAll('.transcript-segment');
+            let isAudioActive = false;
             
             segs.forEach(seg => {
                 const start = parseFloat(seg.getAttribute('data-start'));
                 const end = parseFloat(seg.getAttribute('data-end'));
                 
+                // Ensure text stays above the sliding pill
+                seg.style.position = 'relative';
+                seg.style.zIndex = '1';
+                
                 if (time >= start && time <= end) {
+                    isAudioActive = true;
                     if (seg.dataset.active !== 'true') { 
                         seg.dataset.active = 'true';
                         
-                        // Solid Neon Blue background with Dark Black text
-                        seg.style.setProperty('background-color', '#38BDF8', 'important');  
-                        seg.style.setProperty('color', '#0F172A', 'important');            
+                        // Tell the pill to slide to this exact word's coordinates
+                        pill.style.opacity = '1';
+                        pill.style.top = (seg.offsetTop - 2) + 'px';
+                        pill.style.left = (seg.offsetLeft - 4) + 'px';
+                        pill.style.width = (seg.offsetWidth + 8) + 'px';
+                        pill.style.height = (seg.offsetHeight + 4) + 'px';
+                        
+                        // Highlight the text itself so it pops against the pill
+                        seg.style.setProperty('color', '#38BDF8', 'important');            
                         seg.style.setProperty('font-weight', 'bold', 'important');
                         
                         seg.scrollIntoView({behavior: 'smooth', block: 'center'}); 
@@ -471,13 +500,18 @@ if st.session_state.segments_data:
                     if (seg.dataset.active === 'true') {
                         seg.dataset.active = 'false';
                         
-                        // Return to normal dark mode
+                        // Return text to normal. (We don't hide the pill here, we let it slide!)
                         seg.style.setProperty('background-color', 'transparent', 'important');
                         seg.style.setProperty('color', '#CBD5E1', 'important');
                         seg.style.setProperty('font-weight', 'normal', 'important');
                     }
                 }
             });
+            
+            // Fade the pill out if there are long silent pauses in the audio
+            if (!isAudioActive) {
+                pill.style.opacity = '0';
+            }
             
         }, 500); 
     </script>
