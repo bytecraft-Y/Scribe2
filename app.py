@@ -138,8 +138,11 @@ with col_controls:
             
             st.markdown("**Media Preview:**")
             uploaded_file.seek(0)
-            if file_extension.lower() in ['.mp3', '.wav']:
-                st.audio(uploaded_file)
+            
+            # Force byte-reading for audio to prevent Streamlit player crashes
+            if file_extension.lower() in ['.mp3', '.wav', '.m4a', '.aac', '.flac']:
+                audio_bytes = uploaded_file.read()
+                st.audio(audio_bytes)
             else:
                 st.video(uploaded_file)
             
