@@ -352,7 +352,7 @@ with col_output:
                     st.markdown("<br>", unsafe_allow_html=True)
                     st.download_button("📥 Download Extracted Insights", st.session_state.ai_summary, "Enterprise_Insights_Report.md", "text/markdown")
 # ==========================================
-# JAVASCRIPT BRIDGE (Buffer-Flush Ghost Buster Edition)
+# JAVASCRIPT BRIDGE (Buffer-Flush Ghost Buster & Real-Time Tracker)
 # ==========================================
 if st.session_state.segments_data:
     js_code = r"""
@@ -399,7 +399,7 @@ if st.session_state.segments_data:
                 transcriptBox.dataset.clickAttached = 'true';
             }
             
-            // --- B. SEARCH ENGINE ---
+            // --- B. SEARCH ENGINE (Dark Mode Fix) ---
             if (searchInput && !searchInput.dataset.searchAttached) {
                 searchInput.addEventListener('input', (e) => {
                     const term = e.target.value.trim();
@@ -410,20 +410,22 @@ if st.session_state.segments_data:
                     segs.forEach(seg => {
                         if (!term) {
                             seg.style.opacity = '1'; 
-                            seg.style.backgroundColor = 'transparent';
+                            seg.style.setProperty('background-color', 'transparent', 'important');
+                            seg.style.setProperty('color', '#CBD5E1', 'important');
                         } else if (regex.test(seg.innerText)) {
                             seg.style.opacity = '1'; 
-                            seg.style.backgroundColor = '#FEF08A';
+                            seg.style.setProperty('background-color', '#FEF08A', 'important'); 
+                            seg.style.setProperty('color', '#0F172A', 'important'); 
                         } else {
                             seg.style.opacity = '0.2'; 
-                            seg.style.backgroundColor = 'transparent';
+                            seg.style.setProperty('background-color', 'transparent', 'important');
                         }
                     });
                 });
                 searchInput.dataset.searchAttached = 'true';
             }
             
-            // --- C. THE REAL-TIME TRACKER ---
+            // --- C. THE REAL-TIME TRACKER (High Contrast Fix) ---
             if (searchInput && searchInput.value.trim().length > 0) return;
             
             const time = media.currentTime;
@@ -433,33 +435,29 @@ if st.session_state.segments_data:
                 const start = parseFloat(seg.getAttribute('data-start'));
                 const end = parseFloat(seg.getAttribute('data-end'));
                 
-                segs.forEach(seg => {
-                const start = parseFloat(seg.getAttribute('data-start'));
-                const end = parseFloat(seg.getAttribute('data-end'));
-                
                 if (time >= start && time <= end) {
                     if (seg.dataset.active !== 'true') { 
                         seg.dataset.active = 'true';
                         
-                        // ✨ THE HIGH-CONTRAST FIX ✨
-                        // Solid Neon Blue background with Dark Black text so it never washes out
+                        // Solid Neon Blue background with Dark Black text
                         seg.style.setProperty('background-color', '#38BDF8', 'important');  
                         seg.style.setProperty('color', '#0F172A', 'important');            
+                        seg.style.setProperty('font-weight', 'bold', 'important');
                         
-                        seg.style.fontWeight = 'bold';
                         seg.scrollIntoView({behavior: 'smooth', block: 'center'}); 
                     }
                 } else {
                     if (seg.dataset.active === 'true') {
                         seg.dataset.active = 'false';
                         
-                        // Return to normal dark mode (Transparent background, Light Slate text)
+                        // Return to normal dark mode
                         seg.style.setProperty('background-color', 'transparent', 'important');
                         seg.style.setProperty('color', '#CBD5E1', 'important');
-                        seg.style.fontWeight = 'normal';
+                        seg.style.setProperty('font-weight', 'normal', 'important');
                     }
                 }
-            });            
+            });
+            
         }, 500); 
     </script>
     """
