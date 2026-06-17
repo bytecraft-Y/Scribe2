@@ -279,7 +279,7 @@ with col_output:
                                 # ==========================================
                                 output = f"**🏷️ Extracted Tags:** {', '.join([k.capitalize() for k in top_tags])}\n\n---\n"
                                 
-                                output += f"### 📌 Executive Summary (BART AI)\n{compiled_summary}\n\n"
+                                output += f"### 📌 Executive Summary\n{compiled_summary}\n\n"
                                 
                                 output += "### ✅ Action Items & Tasks\n"
                                 if extracted_actions:
