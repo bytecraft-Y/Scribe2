@@ -6,9 +6,7 @@ import tempfile
 import gc
 import time
 import random
-import re       
-import math     
-from collections import Counter
+import re
 
 # 1. Page Configuration
 st.set_page_config(
@@ -39,15 +37,22 @@ def to_vtt_time(seconds):
     h, rem = divmod(seconds, 3600); m, s = divmod(rem, 60); ms = int((s % 1) * 1000)
     return f"{int(h):02d}:{int(m):02d}:{int(s):02d}.{ms:03d}"
 
-# Load AI Model Natively
+# Load Speech-to-Text Model Natively
 @st.cache_resource
-def load_model():
+def load_whisper_model():
     return WhisperModel("base", device="cpu", compute_type="int8")
 
-model = load_model()
+# Load Hugging Face Summarization Model Natively
+@st.cache_resource
+def load_summarizer_model():
+    from transformers import pipeline
+    # device=-1 forces the model to run safely on the CPU
+    return pipeline("summarization", model="facebook/bart-large-cnn", device=-1)
+
+model = load_whisper_model()
 
 # Header
-st.markdown("<h1 class='app-title'>Scribe AI: Transcript Extractor</h1><span class='app-subtitle'>Audio/Video-to-Text & Insight Extraction Tool</span>", unsafe_allow_html=True)
+st.markdown("<h1 class='app-title'>Scribe AI: Transcript Extractor</h1><span class='app-subtitle'>Audio-to-Text & Insight Extraction Tool</span>", unsafe_allow_html=True)
 st.markdown("---")
 
 col_controls, col_output = st.columns([1, 2], gap="large")
@@ -83,7 +88,6 @@ with col_controls:
             tmp_media.close()
             tmp_media_path = tmp_media.name
             
-            # --- THE PYTHON FIX: NO st.empty() ---
             st.markdown("**Media Preview:**")
             uploaded_file.seek(0)
             if file_extension.lower() in ['.mp3', '.wav']:
@@ -204,77 +208,53 @@ with col_output:
                 col_srt.download_button("🎬 Subtitles (.srt)", st.session_state.srt_text, "Scribe_Transcript.srt")
                 col_vtt.download_button("🌐 Web Subtitles (.vtt)", st.session_state.vtt_text, "Scribe_Transcript.vtt")
 
-            # --- TAB 2: AI INSIGHTS (Local Engine) ---
+            # --- TAB 2: HUGGING FACE TRANSFORMER INSIGHTS ---
             with tab_ai:
-                st.markdown("### 🧠 Transcript Analysis & Insight Extraction")
-                st.write("Extracting insights using a secure, offline TF-IDF and heuristic engine.")
+                st.markdown("### 🧬 Embedded Transformer Engine")
+                st.write("Utilizing an offline **BART neural network** (`facebook/bart-large-cnn`) for deep abstractive text summarization. Your data never leaves your machine.")
                 
                 st.write("---")
                 
                 if st.button("✨ Extract Insights from Transcript", type="primary"):
-                    with st.spinner("Analyzing transcript text locally..."):
-                        raw_transcript = " ".join([s['text'] for s in st.session_state.segments_data])
-                        
-                        sentences = [s.strip() for s in re.split(r'[.!?]', raw_transcript) if len(s.strip()) > 20]
-                        
-                        if not sentences:
-                            st.session_state.ai_summary = "⚠️ Insufficient transcript data to analyze. Please provide a longer audio file."
-                        else:
-                            stop_words = set(["the", "a", "an", "and", "or", "but", "if", "then", "of", "to", "in", "is", "it", "you", "that", "this", "was", "for", "on", "as", "with", "so", "we", "they", "i", "are", "be", "have"])
-                            df = Counter()
-                            sent_tokens = []
-                            for sent in sentences:
-                                tokens = [w.lower() for w in re.findall(r'\b\w+\b', sent) if w.lower() not in stop_words]
-                                sent_tokens.append(tokens)
-                                for token in set(tokens):
-                                    df[token] += 1
+                    with st.spinner("Initializing Hugging Face pipeline & analyzing text... (This may take a moment on the first run)"):
+                        try:
+                            # 1. Load the model from cache
+                            summarizer = load_summarizer_model()
                             
-                            N = len(sentences)
-                            sent_scores = []
-                            global_tf_idf = Counter()
+                            # 2. Prepare the raw text
+                            raw_transcript = " ".join([s['text'] for s in st.session_state.segments_data])
+                            words = raw_transcript.split()
                             
-                            for i, tokens in enumerate(sent_tokens):
-                                score = 0
-                                tf = Counter(tokens)
-                                if len(tokens) > 0:
-                                    for token, count in tf.items():
-                                        idf = math.log(N / (1 + df[token]))
-                                        tf_idf_val = (count / len(tokens)) * idf
-                                        score += tf_idf_val
-                                        global_tf_idf[token] += tf_idf_val
-                                sent_scores.append((score, i, sentences[i]))
-                            
-                            top_scored_sents = sorted(sent_scores, key=lambda x: x[0], reverse=True)[:3]
-                            chronological_summary = sorted(top_scored_sents, key=lambda x: x[1])
-                            top_keywords = [word for word, score in global_tf_idf.most_common(5)]
-                            
-                            action_pattern = re.compile(r'\b(need to|have to|will|should|must|task|assign|todo|action item|fix|update)\b', re.IGNORECASE)
-                            decision_pattern = re.compile(r'\b(decided|agreed|concluded|choose|settled|resolved|instead of)\b', re.IGNORECASE)
-                            
-                            extracted_actions = []
-                            extracted_decisions = []
-                            
-                            for sent in sentences:
-                                if action_pattern.search(sent) and sent not in extracted_actions and len(extracted_actions) < 4:
-                                    extracted_actions.append(sent)
-                                if decision_pattern.search(sent) and sent not in extracted_decisions and len(extracted_decisions) < 3:
-                                    extracted_decisions.append(sent)
-                            
-                            output = f"**🏷️ Extracted Tags (Local Analysis):** {', '.join([k.capitalize() for k in top_keywords])}\n\n---\n"
-                            output += "### 📌 Extracted Summary\n"
-                            for _, _, s in chronological_summary:
-                                output += f"{s.capitalize()}.\n"
-                            output += "\n### ✅ Extracted Action Items\n"
-                            if extracted_actions:
-                                for a in extracted_actions: output += f"* {a.capitalize()}.\n"
-                            else: output += "* No explicit action items detected via local heuristics.\n"
-                            output += "\n### 💡 Extracted Decisions & Insights\n"
-                            if extracted_decisions:
-                                for d in extracted_decisions: output += f"* {d.capitalize()}.\n"
-                            else: output += "* No explicit decisions flagged via local heuristics.\n"
-                            
-                            st.session_state.ai_summary = output
-                            st.toast("Local Insight Extraction Complete!", icon="🧠")
+                            if len(words) < 20:
+                                st.session_state.ai_summary = "⚠️ The transcript is too short to generate a meaningful summary. Please provide longer audio."
+                            else:
+                                # 3. Smart Chunking (BART has a token limit, so we chunk large files by ~400 words)
+                                chunk_size = 400
+                                text_chunks = [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
+                                
+                                summaries = []
+                                for idx, chunk in enumerate(text_chunks):
+                                    # Dynamically calculate max length for short chunks
+                                    chunk_len = len(chunk.split())
+                                    max_len = min(150, int(chunk_len * 0.8))
+                                    min_len = min(30, int(chunk_len * 0.2))
+                                    
+                                    if chunk_len > 10:
+                                        res = summarizer(chunk, max_length=max_len, min_length=min_len, do_sample=False)
+                                        summaries.append(f"* {res[0]['summary_text']}")
+                                
+                                # 4. Compile the Final Output
+                                compiled_summary = "\n".join(summaries)
+                                
+                                output = f"### 📌 Executive Summary (BART AI)\n\n"
+                                output += "The following insights were autonomously generated by the offline deep learning model:\n\n"
+                                output += compiled_summary
+                                
+                                st.session_state.ai_summary = output
+                                st.toast("Transformer Summarization Complete!", icon="🚀")
+                                
+                        except Exception as hf_error:
+                            st.error(f"Error executing Transformer pipeline: {str(hf_error)}")
 
                 # Render Output Card
                 if st.session_state.ai_summary:
@@ -282,7 +262,7 @@ with col_output:
                     st.markdown(st.session_state.ai_summary)
                     st.markdown("</div>", unsafe_allow_html=True)
                     st.markdown("<br>", unsafe_allow_html=True)
-                    st.download_button("📥 Download Extracted Insights", st.session_state.ai_summary, "Extracted_Insights.md", "text/markdown")
+                    st.download_button("📥 Download Extracted Insights", st.session_state.ai_summary, "BART_Extracted_Insights.md", "text/markdown")
 
 
 # ==========================================
@@ -303,21 +283,19 @@ if st.session_state.segments_data:
             // --- THE GHOST BUSTER (BUFFER FLUSH EDITION) ---
             const allMedia = parentDoc.querySelectorAll('video, audio');
             if (allMedia.length > 1) {
-                // If Streamlit duplicates the player, keep the last (newest) one, kill the rest
                 for (let i = 0; i < allMedia.length - 1; i++) {
                     let ghost = allMedia[i];
                     ghost.pause();
                     ghost.removeAttribute('src'); 
-                    ghost.load(); // Forces browser to instantly drop the audio buffer
+                    ghost.load(); 
                     ghost.remove();
                 }
             }
             
-            const media = allMedia[allMedia.length - 1]; // The surviving active player
+            const media = allMedia[allMedia.length - 1]; 
             const searchInput = parentDoc.getElementById('search-input');
             const transcriptBox = parentDoc.getElementById('transcript-box');
             
-            // Abort if elements aren't loaded or if the tab is hidden
             if (!media || !transcriptBox || transcriptBox.offsetHeight === 0) return;
             
             // --- A. CLICK-TO-SEEK ---
