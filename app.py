@@ -299,11 +299,12 @@ with col_output:
 
                 # Render Output Card
                 if st.session_state.ai_summary:
-                    st.markdown("<div style='background: #F8FAFC; padding: 25px; border-radius: 8px; border-left: 5px solid #06B6D4; color: #0F172A; margin-top: 20px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);'>", unsafe_allow_html=True)
-                    st.markdown(st.session_state.ai_summary)
-                    st.markdown("</div>", unsafe_allow_html=True)
+                    # Use Streamlit's native container with a clean border
+                    with st.container(border=True):
+                        st.markdown(st.session_state.ai_summary)
+                    
                     st.markdown("<br>", unsafe_allow_html=True)
-                    st.download_button("📥 Download Extracted Insights", st.session_state.ai_summary, "Enterprise_Insights_Report.md", "text/markdown")                # Render Output Card
+                    st.download_button("📥 Download Extracted Insights", st.session_state.ai_summary, "Enterprise_Insights_Report.md", "text/markdown")
 # ==========================================
 # JAVASCRIPT BRIDGE (Buffer-Flush Ghost Buster Edition)
 # ==========================================
