@@ -24,13 +24,13 @@ bg_image_base64 = "data:image/avif;base64,AAAAHGZ0eXBhdmlmAAAAAG1pZjFhdmlmbWlhZg
 # 2. Custom CSS - Cinematic Dark Theme & Glassmorphism
 st.markdown(f"""
 <style>
-    .stApp {{
+    .stApp {
         /* We use the variable here dynamically using the 'f-string' format */
         background-image: url("{bg_image_base64}");
         background-size: cover;
         background-position: center;
         background-attachment: fixed;
-    }}
+    }
     
     /* =========================================
        2. INVERTING TEXT COLORS FOR DARK MODE
