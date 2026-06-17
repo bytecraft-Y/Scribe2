@@ -433,24 +433,33 @@ if st.session_state.segments_data:
                 const start = parseFloat(seg.getAttribute('data-start'));
                 const end = parseFloat(seg.getAttribute('data-end'));
                 
+                segs.forEach(seg => {
+                const start = parseFloat(seg.getAttribute('data-start'));
+                const end = parseFloat(seg.getAttribute('data-end'));
+                
                 if (time >= start && time <= end) {
                     if (seg.dataset.active !== 'true') { 
                         seg.dataset.active = 'true';
-                        seg.style.backgroundColor = '#DBEAFE';  
-                        seg.style.color = '#1D4ED8';            
+                        
+                        // ✨ THE HIGH-CONTRAST FIX ✨
+                        // Solid Neon Blue background with Dark Black text so it never washes out
+                        seg.style.setProperty('background-color', '#38BDF8', 'important');  
+                        seg.style.setProperty('color', '#0F172A', 'important');            
+                        
                         seg.style.fontWeight = 'bold';
                         seg.scrollIntoView({behavior: 'smooth', block: 'center'}); 
                     }
                 } else {
                     if (seg.dataset.active === 'true') {
                         seg.dataset.active = 'false';
-                        seg.style.backgroundColor = 'transparent';
-                        seg.style.color = '#0F172A';
+                        
+                        // Return to normal dark mode (Transparent background, Light Slate text)
+                        seg.style.setProperty('background-color', 'transparent', 'important');
+                        seg.style.setProperty('color', '#CBD5E1', 'important');
                         seg.style.fontWeight = 'normal';
                     }
                 }
-            });
-            
+            });            
         }, 500); 
     </script>
     """
