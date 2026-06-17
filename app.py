@@ -7,6 +7,7 @@ import gc
 import time
 import random
 import re
+from collections import Counter  # <--- ADD THIS LINE
 
 # 1. Page Configuration
 st.set_page_config(
