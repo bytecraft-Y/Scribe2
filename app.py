@@ -17,15 +17,56 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. Custom CSS - "Chrome Stripped" UI & Enterprise Layout
-st.markdown("""
+# 1. Store the massive string in a variable to keep your CSS clean
+# (You can even put this at the very bottom of your file to keep it out of the way)
+bg_image_base64 = "data:image/avif;base64,AAAAHGZ0eXBhdmlmAAAAAG1pZjFhdmlmbWlhZgAAANZtZXRhAAAAAAAAACFoZGxyAAAAAAAAAABwaWN0AAAAAAAAAAAAAAAAAAAAAA5waXRtAAAAAAABAAAAImlsb2MAAAAAREAAAQABAAAAAAD6AAEAAAAAAAABxAAAACNpaW5mAAAAAAABAAAAFWluZmUCAAAAAAEAAGF2MDEAAAAAVmlwcnAAAAA4aXBjbwAAAAxhdjFDgQQMAAAAABRpc3BlAAAAAAAAAuQAAAHDAAAAEHBpeGkAAAAAAwgICAAAABZpcG1hAAAAAAAAAAEAAQOBAgMAAAHMbWRhdBIACgoZJi4+EwQENBoQMrMDRGAAUUUUQLS3t3jRTKb/btr+IgeFoAbP5/wHRacmVD7kZQkC98PtAWGMROuX9WhcMOasCjuiWrp0s+/L3Rpz/sDZCCWIKgG2+tCXu2VOMa8LlB73LEESJi8oUjGIYot0UzWfHs22/PgMHnkmuvJAv5QhJP76hqXy+liD+lpeF3wOl/78wo8CAFBzA2T2lggkjXLSaWzWOqT6/3urskzDag8exc084R9P2CgDHurh/MgbEfsi55dFAdFyo1sImY44aBkNCiJ3bcYnq/FYdHxft65soiGkaQjy97zSxT7u5ttdok4zdidbdw0w4s1aRURx+anp3eutZ3bNNKrjRZXXSFH+LWoeCGhQogLCClnG4asdpUHOc79K2sIylzTMN+bppY5bfAMv0f9JQVdl8X1FkfoAK4EWIzrqUaLe283AaCDsYb7dT2/wGHq8AYErk2JOXBfSiymS3+ohb/0ZSQ5xKsuc5SBYH8YS4HxoSZiquK0mC/ZmLT1we/g8K5KesMOocDBWLDqEDicslqalePdTRvfOyM8qxIuMlwAUUZ7wqOnOwuvy0fZW1lu9klzlZu2X/sxA"
+
+# 2. Custom CSS - Cinematic Dark Theme & Glassmorphism
+st.markdown(f"""
 <style>
-    #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
-    .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; max-width: 95vw !important; }
-    .app-title { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 2.2rem; color: #0F172A; margin-bottom: 0px; letter-spacing: -0.5px;}
-    .app-subtitle { color: #3B82F6; font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; display: block; }
+    .stApp {{
+        /* We use the variable here dynamically using the 'f-string' format */
+        background-image: url("{bg_image_base64}");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }}
+    
+    /* =========================================
+       2. INVERTING TEXT COLORS FOR DARK MODE
+       ========================================= */
+    .app-title { font-family: 'Inter', sans-serif; font-weight: 800; font-size: 2.2rem; color: #FFFFFF !important; margin-bottom: 0px; letter-spacing: -0.5px;}
+    .app-subtitle { color: #38BDF8 !important; font-size: 1rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 20px; display: block; }
+    p, span, li, h1, h2, h3, h4, h5, h6, label { color: #F1F5F9 !important; }
+    
+    /* =========================================
+       3. FROSTED GLASS PANELS (Glassmorphism)
+       ========================================= */
+    /* This makes the white boxes semi-transparent so the dark background blurs through them beautifully */
+    div[data-testid="stVerticalBlock"] > div[style*="border"] {
+        background: rgba(15, 23, 42, 0.4) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border-radius: 12px;
+    }
+
+    /* =========================================
+       4. TRANSCRIPT BOX & BUTTON STYLING
+       ========================================= */
+    #transcript-box { background: rgba(0, 0, 0, 0.3) !important; color: #F8FAFC !important; border: 1px solid rgba(255, 255, 255, 0.05); }
+    .transcript-segment { color: #CBD5E1 !important; }
+    
+    #search-input { 
+        background: rgba(15, 23, 42, 0.8) !important; 
+        color: #F8FAFC !important; 
+        border: 1px solid rgba(255, 255, 255, 0.2) !important; 
+    }
+    #search-input::placeholder { color: #64748B !important; }
+
     div.stButton > button:first-child { background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%); color: white; font-weight: 600; width: 100%; border-radius: 8px; border: none; transition: 0.3s; }
-    div[data-testid="stTabs"] button { font-weight: 600; font-size: 1.1rem; }
+    div[data-testid="stTabs"] button { font-weight: 600; font-size: 1.1rem; color: #94A3B8; }
+    div[data-testid="stTabs"] button[aria-selected="true"] { color: #38BDF8 !important; }
 </style>
 """, unsafe_allow_html=True)
 
