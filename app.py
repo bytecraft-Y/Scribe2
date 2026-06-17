@@ -41,7 +41,7 @@ def to_vtt_time(seconds):
 # Load Speech-to-Text Model Natively
 @st.cache_resource
 def load_whisper_model():
-    return WhisperModel("base", device="cpu", compute_type="int8")
+    return WhisperModel("small", device="cpu", compute_type="int8", task="translate")
 
 # Load Hugging Face Summarization Model (Bulletproof Direct Method)
 @st.cache_resource
