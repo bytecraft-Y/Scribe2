@@ -483,31 +483,42 @@ if st.session_state.segments_data:
                     if (seg.dataset.active !== 'true') { 
                         seg.dataset.active = 'true';
                         
-                        // Tell the pill to slide to this exact word's coordinates
+                        // Tell the pill to slide to this exact word
                         pill.style.opacity = '1';
-                        pill.style.top = (seg.offsetTop - 2) + 'px';
-                        pill.style.left = (seg.offsetLeft - 4) + 'px';
-                        pill.style.width = (seg.offsetWidth + 30) + 'px';
-                        pill.style.height = (seg.offsetHeight + 4) + 'px';
+                        pill.style.top = seg.offsetTop + 'px';
+                        pill.style.left = seg.offsetLeft + 'px';
+                        pill.style.width = seg.offsetWidth + 'px';
+                        pill.style.height = seg.offsetHeight + 'px';
                         
-                        // Highlight the text itself so it pops against the pill
+                        // Highlight text
                         seg.style.setProperty('color', '#38BDF8', 'important');            
-                        seg.style.setProperty('font-weight', 'bold', 'important');
                         
-                        seg.scrollIntoView({behavior: 'smooth', block: 'center'}); 
+                        // ✨ THE ANTI-JITTER SCROLL FIX ✨
+                        // Instead of 'scrollIntoView', we manually calculate and scroll only the transcript box.
+                        // This stops the main Streamlit window from jumping.
+                        const boxHeight = transcriptBox.clientHeight;
+                        const scrollPos = transcriptBox.scrollTop;
+                        const elementTop = seg.offsetTop;
+                        
+                        // If the text gets too close to the top or bottom of the box, smooth scroll it to the center
+                        if (elementTop < scrollPos + 40 || elementTop > scrollPos + boxHeight - 40) {
+                            transcriptBox.scrollTo({
+                                top: elementTop - (boxHeight / 2),
+                                behavior: 'smooth'
+                            });
+                        }
                     }
                 } else {
                     if (seg.dataset.active === 'true') {
                         seg.dataset.active = 'false';
                         
-                        // Return text to normal. (We don't hide the pill here, we let it slide!)
+                        // Return text to normal
                         seg.style.setProperty('background-color', 'transparent', 'important');
                         seg.style.setProperty('color', '#CBD5E1', 'important');
                         seg.style.setProperty('font-weight', 'normal', 'important');
                     }
                 }
             });
-            
             // Fade the pill out if there are long silent pauses in the audio
             if (!isAudioActive) {
                 pill.style.opacity = '0';
