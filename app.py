@@ -217,7 +217,7 @@ with col_output:
                
                 
                 if st.button("✨ Extract Insights from Transcript", type="primary"):
-                    with st.spinner("Analyzing text... (This may take a moment on the first run)"):
+                    with st.spinner("Analyzing text... (This may take a moment)"):
                         try:
                             # 1. Load the model and tokenizer from cache
                             tokenizer, summarizer_model = load_summarizer_model()
