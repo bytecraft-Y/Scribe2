@@ -265,7 +265,9 @@ with col_output:
             st.markdown("### 📄 Extraction Output")
             st.info("👈 Upload media and click 'Generate Transcript' to begin.")
         else:
-            tab_transcript, tab_ai = st.tabs(["📄 Generated Transcript", "✨ Extract Insights"])
+            tab_transcript, tab_ai = st.tabs(["📄
+            
+        Generated Transcript", "✨ Extract Insights"])
             
             # --- TAB 1: RAW TRANSCRIPT ---
             with tab_transcript:
@@ -284,94 +286,108 @@ with col_output:
                 col_srt.download_button("🎬 Subtitles (.srt)", st.session_state.srt_text, "Scribe_Transcript.srt")
                 col_vtt.download_button("🌐 Web Subtitles (.vtt)", st.session_state.vtt_text, "Scribe_Transcript.vtt")
             
-            # --- TAB 2: HYBRID OFFLINE ENGINE (BART + HEURISTICS) ---
+           # --- TAB 2: HYBRID OFFLINE ENGINE (Smarter NLP) ---
             with tab_ai:
-                st.markdown("### 🧬 Hybrid AI Extraction Engine")
-                st.write("Using a **BART neural network** for abstractive summarization, combined with a **Mathematical NLP engine** for task and decision extraction.")
+                st.markdown("### 🧬 Advanced Offline Extraction")
+                st.write("Using Neural Summarization + Bigram Phrase Extraction & Contextual Heuristics.")
                 st.write("---")
                 
                 if st.button("✨ Extract Insights from Transcript", type="primary"):
-                    with st.spinner("Analyzing text... (This may take a moment)"):
+                    with st.spinner("Running Advanced NLP Pipeline..."):
                         try:
-                            # 1. Load the model and tokenizer from cache
-                            tokenizer, summarizer_model = load_summarizer_model()
-                            
-                            # 2. Prepare the raw text
+                            tokenizer, summarizer = load_summarizer_model()
                             raw_transcript = " ".join([s['text'] for s in st.session_state.segments_data])
                             words = raw_transcript.split()
                             
                             if len(words) < 20:
-                                st.session_state.ai_summary = "⚠️ The transcript is too short to generate a meaningful summary. Please provide longer audio."
+                                st.session_state.ai_summary = "⚠️ Transcript too short for meaningful analysis."
                             else:
-                                # PART A: BART NEURAL SUMMARIZATION
+                                # ==========================================
+                                # 1. NEURAL SUMMARIZATION (Unchanged)
+                                # ==========================================
                                 chunk_size = 400
                                 text_chunks = [" ".join(words[i:i+chunk_size]) for i in range(0, len(words), chunk_size)]
-                                
                                 summaries = []
                                 for chunk in text_chunks:
                                     if len(chunk.split()) > 10:
                                         inputs = tokenizer(chunk, max_length=1024, return_tensors="pt", truncation=True)
-                                        summary_ids = summarizer_model.generate(
-                                            inputs["input_ids"], 
-                                            num_beams=4, 
-                                            max_length=150, 
-                                            min_length=30, 
-                                            early_stopping=True
-                                        )
-                                        summary_text = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
-                                        summaries.append(f"{summary_text}")
+                                        summary_ids = summarizer.generate(inputs["input_ids"], num_beams=4, max_length=120, min_length=30, early_stopping=True)
+                                        summaries.append(tokenizer.decode(summary_ids[0], skip_special_tokens=True))
+                                compiled_summary = " ".join(summaries)
                                 
-                                compiled_summary = "\n\n".join(summaries)
+                                # ==========================================
+                                # 2. UPGRADED TAG EXTRACTION (Bigrams / 2-Word Phrases)
+                                # ==========================================
+                                # A much larger stop-word list to filter out conversational filler
+                                stop_words = {"the", "a", "an", "and", "or", "but", "if", "then", "of", "to", "in", "is", "it", "you", "that", "this", "was", "for", "on", "as", "with", "so", "we", "they", "i", "are", "be", "have", "not", "do", "will", "can", "about", "what", "how", "just", "like", "know", "going", "think", "really", "would", "could", "should", "very", "much", "from", "at", "by", "there", "out"}
                                 
-                                # PART B: HEURISTIC EXTRACTION (Actions, Decisions, Tags)
+                                clean_words = [w.lower().strip(".,!?\"'()[]") for w in words]
+                                valid_words = [w for w in clean_words if w not in stop_words and len(w) > 2]
+                                
+                                # Create Bigrams (pairs of consecutive words)
+                                bigrams = [f"{valid_words[i]} {valid_words[i+1]}" for i in range(len(valid_words)-1)]
+                                bigram_counts = Counter(bigrams)
+                                
+                                # Fallback to single words if no repeating bigrams are found
+                                top_phrases = [phrase for phrase, count in bigram_counts.most_common(5) if count > 1]
+                                if not top_phrases:
+                                    top_phrases = [word for word, count in Counter(valid_words).most_common(5)]
+
+                                # ==========================================
+                                # 3. UPGRADED HEURISTICS (Context-Aware Regex)
+                                # ==========================================
                                 sentences = [s.strip() for s in re.split(r'[.!?]', raw_transcript) if len(s.strip()) > 15]
                                 
-                                # 1. Extract Tags (Basic Frequency)
-                                stop_words = set(["the", "a", "an", "and", "or", "but", "if", "then", "of", "to", "in", "is", "it", "you", "that", "this", "was", "for", "on", "as", "with", "so", "we", "they", "i", "are", "be", "have", "not", "do", "will", "can", "about", "what", "how"])
-                                word_counts = Counter([w.lower() for w in re.findall(r'\b\w+\b', raw_transcript) if w.lower() not in stop_words and len(w) > 3])
-                                top_tags = [word for word, count in word_counts.most_common(5)]
+                                # Requires a subject (I/We/Team) before the action verb to prevent false positives
+                                action_pattern = re.compile(r'\b(i will|we will|we need to|i need to|action item|task is|must remember to|make sure to)\b', re.IGNORECASE)
                                 
-                                # 2. Extract Action Items & Decisions (Regex Heuristics)
-                                action_pattern = re.compile(r'\b(need to|have to|will|should|must|task|assign|todo|action item|fix|update|build)\b', re.IGNORECASE)
-                                decision_pattern = re.compile(r'\b(decided|agreed|concluded|choose|settled|resolved|instead of)\b', re.IGNORECASE)
+                                # Requires stronger definitive phrasing
+                                decision_pattern = re.compile(r'\b(we decided|agreed that|finalized|conclusion is|going forward we|instead of)\b', re.IGNORECASE)
                                 
-                                extracted_actions = []
-                                extracted_decisions = []
+                                # Flag questions as unresolved items/parking lot
+                                question_pattern = re.compile(r'\b(how do we|what if|should we|do we know)\b', re.IGNORECASE)
+                                
+                                extracted_actions, extracted_decisions, open_questions = [], [], []
                                 
                                 for sent in sentences:
-                                    if action_pattern.search(sent) and sent not in extracted_actions and len(extracted_actions) < 5:
-                                        extracted_actions.append(sent)
-                                    if decision_pattern.search(sent) and sent not in extracted_decisions and len(extracted_decisions) < 4:
-                                        extracted_decisions.append(sent)
+                                    if action_pattern.search(sent) and len(extracted_actions) < 5:
+                                        # Clean the sentence: Capitalize first letter, ensure it ends with punctuation
+                                        extracted_actions.append(sent.capitalize().strip() + ".")
+                                    elif decision_pattern.search(sent) and len(extracted_decisions) < 4:
+                                        extracted_decisions.append(sent.capitalize().strip() + ".")
+                                    elif question_pattern.search(sent) and len(open_questions) < 3:
+                                        open_questions.append(sent.capitalize().strip() + "?")
 
-                                # PART C: COMPILE THE FINAL ENTERPRISE REPORT
-                                output = f"**🏷️ Extracted Tags:** {', '.join([k.capitalize() for k in top_tags])}\n\n---\n"
+                                # ==========================================
+                                # 4. BUILD PROFESSIONAL REPORT
+                                # ==========================================
+                                output = f"**🏷️ Key Topics & Tags:** `{', '.join([k.title() for k in top_phrases])}`\n\n---\n"
                                 output += f"### 📌 Executive Summary\n{compiled_summary}\n\n"
                                 
-                                output += "### ✅ Action Items & Tasks\n"
+                                output += "### ✅ Action Items & Next Steps\n"
                                 if extracted_actions:
-                                    for a in extracted_actions: output += f"* {a.capitalize()}.\n"
-                                else: output += "* No explicit action items detected in this transcript.\n"
+                                    for a in extracted_actions: output += f"- {a}\n"
+                                else: output += "- *No explicit action items detected.*\n"
                                 
-                                output += "\n### 💡 Key Decisions & Insights\n"
+                                output += "\n### 💡 Key Decisions\n"
                                 if extracted_decisions:
-                                    for d in extracted_decisions: output += f"* {d.capitalize()}.\n"
-                                else: output += "* No explicit strategic decisions flagged.\n"
+                                    for d in extracted_decisions: output += f"- {d}\n"
+                                else: output += "- *No explicit strategic decisions flagged.*\n"
+                                
+                                if open_questions:
+                                    output += "\n### ❓ Open Questions / Parking Lot\n"
+                                    for q in open_questions: output += f"- {q}\n"
                                 
                                 st.session_state.ai_summary = output
-                                st.toast("Hybrid Extraction Complete!", icon="🚀")
                                 
                         except Exception as hf_error:
-                            st.error(f"Error executing AI pipeline: {str(hf_error)}")
+                            st.error(f"Pipeline Error: {str(hf_error)}")
 
                 # Render Output Card
-                if st.session_state.ai_summary:
+                if st.session_state.get('ai_summary'):
                     with st.container(border=True):
                         st.markdown(st.session_state.ai_summary)
-                    
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    st.download_button("📥 Download Extracted Insights", st.session_state.ai_summary, "Enterprise_Insights_Report.md", "text/markdown")
-
+                    st.download_button("📥 Download Report", st.session_state.ai_summary, "Scribe_Insights.md", "text/markdown")
 # ==========================================
 # JAVASCRIPT BRIDGE (Sliding Pill Animation)
 # ==========================================
