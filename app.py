@@ -111,7 +111,7 @@ col_controls, col_output = st.columns([1, 2], gap="large")
 # LEFT PANEL: MEDIA & ANALYTICS
 # ==========================================
 with col_controls:
-    with st.container(height=720, border=True):
+    with st.container(border=True):
         st.markdown("### 📥 Source Media")
         
         # Initialize States
@@ -260,7 +260,7 @@ with col_controls:
 # RIGHT PANEL: TABS & INTERACTIVITY
 # ==========================================
 with col_output:
-    with st.container(height=720, border=True):
+    with st.container(border=True):
         if not st.session_state.segments_data:
             st.markdown("### 📄 Extraction Output")
             st.info("👈 Upload media and click 'Generate Transcript' to begin.")
