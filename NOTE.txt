@@ -1,0 +1,32 @@
+Welcome to the Scribe AI Capstone Project Repository.
+
+Thank you for taking the time to review my capstone project for Edunet Foundation. I have built Scribe AI, a localized, Edge-AI multimedia transcription and heuristic NLP extraction tool.
+
+To help you navigate this repository and evaluate the codebase efficiently, I want to highlight a few key architectural decisions and provide a quick guide on what to look for:
+
+1. Core Architecture & Offline Processing
+My primary engineering goal was to build a powerful AI tool that completely eliminates the need for third-party cloud computing, thereby ensuring total data privacy. You will notice in the code that the faster-whisper matrix and the Hugging Face BART neural network are executed entirely locally via CPU computation.
+
+2. Where to Focus Your Code Review
+
+app.py: This is the core engine. Here you will find the Streamlit UI routing, the Whisper inference logic, and the Hybrid AI heuristic extraction pipeline (Regex pattern matching and stop-word filtering).
+
+The JavaScript Bridge: Inside app.py, pay special attention to the injected components.html block. Streamlit is inherently stateless and lacks bi-directional media syncing. I wrote a custom JS/DOM manipulation script to create the "sliding pill tracker" and enable click-to-seek video functionality without breaking the Python backend.
+
+3. Running the Application Locally
+If you intend to run this application on your local machine, please ensure you have installed the system-level dependency (ffmpeg) listed in packages.txt before installing the Python libraries in requirements.txt.
+
+Note: Upon the very first execution, the system will take a few moments to download and cache the Whisper and BART model weights. Subsequent runs will be significantly faster.
+
+4. The Final Output
+Once the application processes a media file, I highly recommend testing the "Extract Insights" tab. It compiles a highly detailed, downloadable Markdown (.md) Enterprise Report documenting executive summaries, tasks, and decisions.
+
+Thank you again for your time and feedback. I look forward to your evaluation.
+
+Best regards,
+
+Yash Vats Computer Science & Engineering
+
+GLA University
+
+*** A quick tip for GitHub: Make sure your requirements.txt, packages.txt, app.py, and your presentation deck (.pptx or .pdf) are all uploaded to the main folder of the repository so the reviewer can find everything immediately!
