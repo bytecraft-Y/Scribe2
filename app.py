@@ -267,7 +267,7 @@ with col_output:
         else:
             tab_transcript, tab_ai = st.tabs(["📄"])
             
-        Generated Transcript", "Extract Insights"])
+        Generated Transcript", (["Extract Insights"])
             
             # --- TAB 1: RAW TRANSCRIPT ---
             with tab_transcript:
