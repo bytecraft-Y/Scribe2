@@ -52,10 +52,10 @@ st.markdown(f"""
     /* FROSTED GLASS PANELS (Glassmorphism) */
     div[data-testid="stVerticalBlock"] > div[style*="border"] {{
         background: rgba(15, 23, 42, 0.4) !important;
-        border: 2px solid rgba(255, 255, 255, 0.1) !important;
+        border: 5px solid rgba(255, 255, 255, 0.1) !important;
         backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
-        border-radius: 12px;
+        border-radius: 20px;
     }}
 
     /* TRANSCRIPT BOX & BUTTON STYLING */
@@ -64,7 +64,7 @@ st.markdown(f"""
     #search-input {{ 
         background: rgba(15, 23, 42, 0.8) !important; 
         color: #F8FAFC !important; 
-        border: 2px solid rgba(255, 255, 255, 0.2) !important; 
+        border: 5px solid rgba(255, 255, 255, 0.2) !important; 
     }}
     #search-input::placeholder {{ color: #64748B !important; }}
 
