@@ -265,7 +265,7 @@ with col_output:
             st.markdown("### 📄 Extraction Output")
             st.info("👈 Upload media and click 'Generate Transcript' to begin.")
         else:
-            tab_transcript, tab_ai = st.tabs(["📄
+            tab_transcript, tab_ai = st.tabs(["📄"])
             
         Generated Transcript", "✨ Extract Insights"])
             
